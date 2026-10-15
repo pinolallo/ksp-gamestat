@@ -264,7 +264,8 @@ async function loadSummary() {
                 document.getElementById('lastUpdate').textContent = formatDate(summary.last_update);
             }
             if (summary.game_ut) gameUt = summary.game_ut;
-            
+            if (summary.corps)   renderCorpsSummary(summary.corps);
+
             document.getElementById('summaryPanel').style.display = 'block';
             document.getElementById('tabsNav').style.display = 'flex';
         }
@@ -288,6 +289,27 @@ async function loadKerbals() {
         console.error('Error loading kerbals:', error);
         showToast('Error loading kerbals', 'error');
     }
+}
+
+function renderCorpsSummary(corps) {
+    const el = document.getElementById('corpsSummary');
+    if (!el) return;
+    const TRAIT_ICON = { Pilot: '✈️', Engineer: '🔧', Scientist: '🔬' };
+    const traits = ['Pilot', 'Engineer', 'Scientist'];
+    el.innerHTML = traits.map(trait => {
+        const d = corps[trait] || { assigned: 0, available: 0 };
+        const total = d.assigned + d.available;
+        const icon  = TRAIT_ICON[trait];
+        return `<div class="corps-block">
+            <div class="corps-trait">${icon} ${trait.toUpperCase()}S</div>
+            <div class="corps-stats">
+                <span class="corps-assigned">${d.assigned} <span class="corps-label">ASSIGNED</span></span>
+                <span class="corps-sep">/</span>
+                <span class="corps-available">${d.available} <span class="corps-label">AVAILABLE</span></span>
+                <span class="corps-total">(${total})</span>
+            </div>
+        </div>`;
+    }).join('');
 }
 
 // Render kerbals

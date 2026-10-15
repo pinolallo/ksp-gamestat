@@ -525,6 +525,20 @@ class DatabaseManager:
         last_update = meta_row[0] if meta_row else None
         game_ut     = float(meta_row[1]) if meta_row and meta_row[1] else 0.0
 
+        # Corps breakdown: count per trait × state (Assigned / Available)
+        cursor.execute('''
+            SELECT trait, state, COUNT(*) as c
+            FROM kerbals
+            WHERE is_tourist = 0 AND trait != '' AND state IN ('Assigned', 'Available')
+            GROUP BY trait, state
+        ''')
+        corps = {}
+        for row in cursor.fetchall():
+            trait, state, count = row['trait'], row['state'], row['c']
+            if trait not in corps:
+                corps[trait] = {'assigned': 0, 'available': 0}
+            corps[trait]['assigned' if state == 'Assigned' else 'available'] = count
+
         return {
             'total_kerbals': total_kerbals,
             'total_flights': total_flights,
@@ -533,6 +547,7 @@ class DatabaseManager:
             'unique_locations': unique_locations,
             'last_update': last_update,
             'game_ut': game_ut,
+            'corps': corps,
         }
 
     def get_system_info(self) -> Dict:

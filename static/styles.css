@@ -553,6 +553,44 @@ body {
     max-width: 400px;
 }
 
+/* Corps Summary Bar */
+.corps-summary {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+.corps-block {
+    flex: 1;
+    min-width: 200px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+.corps-trait {
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: var(--text-secondary);
+}
+.corps-stats {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+}
+.corps-assigned { color: var(--accent-cyan); font-weight: 700; }
+.corps-available { color: var(--accent-orange); font-weight: 700; }
+.corps-label { font-size: 0.6rem; letter-spacing: 1px; font-weight: 400; opacity: 0.7; }
+.corps-sep { color: var(--text-secondary); }
+.corps-total { color: var(--text-secondary); font-size: 0.75rem; }
+
 /* Kerbals Grid */
 .kerbals-grid {
     display: grid;
