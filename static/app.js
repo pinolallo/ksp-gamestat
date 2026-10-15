@@ -303,7 +303,7 @@ function renderKerbals(kerbals) {
                     <div class="kerbal-stat-value">${k.experience.toFixed(1)}</div>
                 </div>
                 <div class="kerbal-stat">
-                    <div class="kerbal-stat-label">FLIGHTS</div>
+                    <div class="kerbal-stat-label">MISSIONS</div>
                     <div class="kerbal-stat-value">${k.flights}</div>
                 </div>
                 <div class="kerbal-stat">
@@ -537,7 +537,7 @@ function populateModal(k) {
             <div class="modal-stat-value">${k.experience.toFixed(1)}</div>
         </div>
         <div class="modal-stat">
-            <div class="modal-stat-label">Flights</div>
+            <div class="modal-stat-label">Missions</div>
             <div class="modal-stat-value">${k.flights}</div>
         </div>
         <div class="modal-stat">

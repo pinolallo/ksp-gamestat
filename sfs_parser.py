@@ -205,10 +205,16 @@ class SFSParser:
         return kerbals
     
     def parse_flight_logs(self, kerbals: Dict[str, KerbalStats]) -> Dict[str, KerbalStats]:
-        """Analizza i flight log per contare voli e destinazioni"""
+        """Parse CAREER_LOG and FLIGHT_LOG blocks to count missions and build destination history."""
+        # Only count meaningful flight milestones from CAREER_LOG; skip crew-ops like ExitVessel/BoardVessel
+        FLIGHT_EVENTS = {
+            'Flight', 'Suborbit', 'Orbit', 'Flyby', 'Escape',
+            'Land', 'Splashdown', 'Crash', 'PlantFlag',
+        }
         with open(self.filepath, 'r', encoding='utf-8', errors='ignore') as f:
             in_roster = False
             in_kerbal = False
+            in_career_log = False
             in_flight_log = False
             current_kerbal_name = None
             indent_level = 0
@@ -220,6 +226,8 @@ class SFSParser:
                     indent_level -= 1
                     if in_flight_log and indent_level == 2:
                         in_flight_log = False
+                    elif in_career_log and indent_level == 2:
+                        in_career_log = False
                     elif in_kerbal and indent_level == 1:
                         in_kerbal = False
                         current_kerbal_name = None
@@ -233,27 +241,31 @@ class SFSParser:
                     in_kerbal = True
                     indent_level = 1
                     current_kerbal_name = None
-                elif in_kerbal and not in_flight_log and indent_level == 2:
+                elif in_kerbal and not in_flight_log and not in_career_log and indent_level == 2:
                     if stripped.startswith('name ='):
                         current_kerbal_name = stripped.split('=', 1)[1].strip()
                     elif stripped == 'FLIGHT_LOG':
                         in_flight_log = True
-                elif in_flight_log:
+                    elif stripped == 'CAREER_LOG':
+                        in_career_log = True
+                elif in_flight_log or in_career_log:
                     if stripped.startswith('flight ='):
                         try:
                             count = int(stripped.split('=', 1)[1].strip())
                             if current_kerbal_name and current_kerbal_name in kerbals:
-                                kerbals[current_kerbal_name].flights = count
+                                kerbals[current_kerbal_name].flights = max(
+                                    kerbals[current_kerbal_name].flights, count
+                                )
                         except ValueError:
                             pass
                     elif '=' in stripped:
-                        # Format: "N = EventType,Location"
                         key, _, value = stripped.partition('=')
                         if key.strip().isdigit() and ',' in value:
-                            _, _, location = value.strip().partition(',')
-                            location = location.strip()
+                            event_type, _, body = value.strip().partition(',')
+                            location = body.strip()
                             if location and current_kerbal_name and current_kerbal_name in kerbals:
-                                kerbals[current_kerbal_name].add_location(location)
+                                if in_flight_log or event_type.strip() in FLIGHT_EVENTS:
+                                    kerbals[current_kerbal_name].add_location(location)
 
                 if stripped.startswith('{'):
                     indent_level += 1
