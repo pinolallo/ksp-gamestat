@@ -47,6 +47,7 @@ class KerbalStats:
     current_vessel: str = ''
 
     hired_ut: float = 0.0  # UT (seconds) when rescued; 0.0 = veteran / unknown
+    body_achievements: Dict[str, str] = field(default_factory=dict)  # body -> best activity
 
     def add_location(self, location: str):
         """Aggiunge una visita a una location"""
@@ -213,6 +214,11 @@ class SFSParser:
             'Flight', 'Suborbit', 'Orbit', 'Flyby', 'Escape',
             'Land', 'Splashdown', 'Crash', 'PlantFlag',
         }
+        # Higher rank = better achievement (used to track best activity per body)
+        ACTIVITY_RANK = {
+            'Flight': 1, 'Suborbit': 2, 'Flyby': 3, 'Escape': 3,
+            'Orbit': 4, 'Crash': 5, 'Splashdown': 6, 'PlantFlag': 6, 'Land': 6,
+        }
         with open(self.filepath, 'r', encoding='utf-8', errors='ignore') as f:
             in_roster = False
             in_kerbal = False
@@ -265,9 +271,13 @@ class SFSParser:
                         if key.strip().isdigit() and ',' in value:
                             event_type, _, body = value.strip().partition(',')
                             location = body.strip()
+                            event_type = event_type.strip()
                             if location and current_kerbal_name and current_kerbal_name in kerbals:
-                                if in_flight_log or event_type.strip() in FLIGHT_EVENTS:
+                                if in_flight_log or event_type in FLIGHT_EVENTS:
                                     kerbals[current_kerbal_name].add_location(location)
+                                    k = kerbals[current_kerbal_name]
+                                    if ACTIVITY_RANK.get(event_type, 0) > ACTIVITY_RANK.get(k.body_achievements.get(location, ''), 0):
+                                        k.body_achievements[location] = event_type
 
                 if stripped.startswith('{'):
                     indent_level += 1
@@ -625,18 +635,39 @@ class SFSParser:
         game_ut = self.parse_rescue_dates(kerbals)
         print(f"Game UT: {game_ut:.0f}s")
 
-        # Synthetic rating: sum(visit_count * body_tier) when save has no experienceLevel
-        BODY_TIERS = {
-            'Sun':1,'Kerbin':1,'Mun':2,'Minmus':3,'Gilly':4,'Eve':5,
-            'Duna':6,'Ike':4,'Moho':7,'Dres':5,'Eeloo':8,
-            'Jool':8,'Laythe':7,'Tylo':7,'Vall':6,'Bop':5,'Pol':5,
+        # Compute KSP experience from career achievements.
+        # Each body awards XP for the best activity achieved there.
+        # Values: (orbit/flyby XP, surface XP) — from KSP game data.
+        BODY_XP = {
+            'Sun':    (6.0,  6.0),
+            'Kerbin': (0.5,  0.5),
+            'Mun':    (1.5,  3.0),
+            'Minmus': (2.0,  4.0),
+            'Eve':    (2.5,  7.0),
+            'Gilly':  (1.5,  2.5),
+            'Duna':   (2.5,  8.0),
+            'Ike':    (2.5,  4.0),
+            'Moho':   (3.5,  9.0),
+            'Dres':   (3.5,  7.0),
+            'Jool':   (4.0,  4.0),
+            'Laythe': (4.5,  7.0),
+            'Vall':   (4.5,  5.0),
+            'Tylo':   (5.0, 10.0),
+            'Bop':    (4.5,  5.0),
+            'Pol':    (4.5,  5.0),
+            'Eeloo':  (5.5, 12.0),
         }
+        SURFACE_ACTS = {'Land', 'Splashdown', 'Crash', 'PlantFlag'}
+        KSP_LEVELS   = [2, 6, 16, 32, 64]
+
         for kerbal in kerbals.values():
-            if kerbal.experience == 0.0 and kerbal.locations:
-                kerbal.experience = sum(
-                    cnt * BODY_TIERS.get(loc, 1)
-                    for loc, cnt in kerbal.locations.items()
-                )
+            if kerbal.experience == 0.0 and kerbal.body_achievements:
+                xp = 0.0
+                for body, act in kerbal.body_achievements.items():
+                    orbit_xp, surf_xp = BODY_XP.get(body, (1.5, 3.0))
+                    xp += surf_xp if act in SURFACE_ACTS else orbit_xp
+                kerbal.experience = round(xp, 2)
+            kerbal.experience_level = sum(1 for t in KSP_LEVELS if kerbal.experience >= t)
 
         # Parse contracts (aggregated by type)
         print("Parsing contracts...")
