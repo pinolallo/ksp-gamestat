@@ -1,6 +1,6 @@
 """
-Parser incrementale per file .sfs di Kerbal Space Program
-Gestisce file grandi (98MB+) con parsing efficiente e incrementale
+Incremental parser for Kerbal Space Program .sfs save files.
+Handles large files (98 MB+) efficiently with MD5-based change detection.
 """
 
 import re
@@ -89,7 +89,7 @@ class SFSParser:
         self.file_hash: Optional[str] = None
         
     def calculate_file_hash(self) -> str:
-        """Calcola hash del file per rilevare modifiche"""
+        """Compute MD5 hash of the file to detect changes"""
         hasher = hashlib.md5()
         with open(self.filepath, 'rb') as f:
             # Leggi in chunks per file grandi
@@ -510,7 +510,6 @@ class SFSParser:
         Esegue il parsing completo del file
         Returns: (kerbals_dict, contracts_dict, file_hash)
         """
-        # Calcola hash per tracking delle modifiche
         file_hash = self.calculate_file_hash()
         
         # Parse kerbals

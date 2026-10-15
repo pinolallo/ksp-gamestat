@@ -1,6 +1,6 @@
 """
-Database manager per KSP GameStats
-Gestisce il salvataggio e recupero dei dati con SQLite
+SQLite database manager for KSP GameStats.
+Handles persistence and retrieval of kerbal, contract, and parse-history data.
 """
 
 import sqlite3
@@ -12,7 +12,7 @@ from sfs_parser import KerbalStats, ContractStats, ContractRecord
 
 
 class DatabaseManager:
-    """Gestisce il database SQLite per le statistiche di KSP"""
+    """SQLite database manager for KSP statistics"""
 
     def __init__(self, db_path: str = 'ksp_stats.db'):
         self.db_path = db_path
@@ -138,7 +138,7 @@ class DatabaseManager:
         self.conn.commit()
     
     def needs_update(self, filepath: str, current_hash: str) -> bool:
-        """Verifica se il file è stato modificato dall'ultimo parsing"""
+        """Return True if the file has changed since the last parse"""
         cursor = self.conn.cursor()
         cursor.execute('''
             SELECT file_hash FROM file_metadata 
@@ -157,7 +157,7 @@ class DatabaseManager:
         """Aggiorna i metadata del file parsato"""
         cursor = self.conn.cursor()
         
-        # Verifica se esiste già un record
+        # Check if a record already exists for this file
         cursor.execute('SELECT id, parse_count FROM file_metadata WHERE filepath = ?', (filepath,))
         row = cursor.fetchone()
         
@@ -176,7 +176,7 @@ class DatabaseManager:
         self.conn.commit()
     
     def save_kerbals(self, kerbals: Dict[str, KerbalStats]):
-        """Salva o aggiorna le statistiche dei Kerbals"""
+        """Save or update kerbal statistics (full replace on each parse)"""
         cursor = self.conn.cursor()
 
         # Remove stale entries not in current parse (handles tourist cleanup etc.)
@@ -219,11 +219,11 @@ class DatabaseManager:
                   stats.veteran, stats.is_badass,
                   stats.current_location, stats.current_vessel))
             
-            # Ottieni l'ID del kerbal
+            # Get the kerbal's row ID
             cursor.execute('SELECT id FROM kerbals WHERE name = ?', (name,))
             kerbal_id = cursor.fetchone()[0]
             
-            # Salva le locations
+            # Save visit locations
             for location, count in stats.locations.items():
                 cursor.execute('''
                     INSERT INTO kerbal_locations (kerbal_id, location, visit_count, last_updated)
@@ -236,7 +236,7 @@ class DatabaseManager:
         self.conn.commit()
     
     def save_contracts(self, contracts: Dict[str, ContractStats]):
-        """Salva o aggiorna le statistiche dei contratti"""
+        """Save or update contract statistics"""
         cursor = self.conn.cursor()
         
         for contract_type, stats in contracts.items():
@@ -394,7 +394,7 @@ class DatabaseManager:
                 'locations': []
             }
 
-            # Ottieni le locations
+            # Fetch visit locations
             cursor.execute('''
                 SELECT location, visit_count
                 FROM kerbal_locations

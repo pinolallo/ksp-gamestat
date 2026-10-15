@@ -1,184 +1,187 @@
-# KSP GameStats - Mission Control Dashboard
+# KSP GameStats — Mission Control Dashboard
 
-Web application per analizzare e visualizzare le statistiche di gioco di Kerbal Space Program.
+A desktop application for analysing and visualising Kerbal Space Program save-file statistics. Built with Electron + Python/Flask, it runs as a native app on macOS, Windows, and Linux — no Python installation required.
 
 ![KSP GameStats](https://img.shields.io/badge/KSP-GameStats-00d9ff?style=for-the-badge)
+![Platform](https://img.shields.io/badge/platform-mac%20%7C%20win%20%7C%20linux-lightgrey?style=for-the-badge)
+![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)
 
-## 🚀 Caratteristiche
+---
 
-- **Parser Incrementale**: Parsing efficiente del file persistent.sfs (anche per file da 98MB+)
-- **Cache Intelligente**: Sistema basato su hash per evitare parsing ripetuti non necessari
-- **Database SQLite**: Salvataggio persistente dei dati
-- **Dashboard Interattiva**: Interfaccia web space-themed con design distintivo
-- **Statistiche Kerbals**: Voli completati e destinazioni visitate per ogni astronauta
-- **Statistiche Contratti**: Analisi per tipologia con guadagni totali e medi
+## Features
 
-## 📋 Requisiti
+- **Kerbal Roster** — flights completed, current location, vessel assignment, synthetic experience rating, and full visit history per body
+- **Contracts Dashboard** — visual progression timeline: cumulative earnings, contracts per period, earnings per period, prestige breakdown, and top destinations
+- **Contract Drill-down** — click any contract type to see its own filtered dashboard; TourismContract shows passenger counts instead of funds
+- **Incremental Parsing** — MD5-based cache avoids re-parsing an unchanged save file; force-refresh available
+- **SQLite Database** — stored in the OS user-data directory, survives app updates
+- **Space-Themed UI** — Orbitron/IBM Plex Mono fonts, animated starfield, cyan/orange palette
+- **Native File Picker** — Browse for `persistent.sfs` without typing the path
 
-- Python 3.8+
-- Browser moderno (Chrome, Firefox, Safari, Edge)
+---
 
-## 🔧 Installazione
+## Download
 
-1. **Copia i file** nella directory del progetto:
-   ```bash
-   cd /Users/sdipietr/Projects/ksp-gamestat/
-   ```
+Pre-built installers are available on the [Releases](https://github.com/pinolallo/ksp-gamestat/releases) page:
 
-2. **Installa le dipendenze Python**:
-   ```bash
-   pip install -r requirements.txt
-   ```
+| Platform | File |
+|---|---|
+| macOS (Apple Silicon) | `KSP-GameStats-*-arm64.dmg` |
+| macOS (Intel) | `KSP-GameStats-*-x64.dmg` |
+| Windows | `KSP-GameStats-Setup-*.exe` |
+| Linux | `KSP-GameStats-*.AppImage` / `.deb` |
 
-## 🎮 Utilizzo
+### macOS note (unsigned build)
 
-### 1. Avvia il server
+The app is not notarized. After dragging to Applications, run once in Terminal:
 
 ```bash
-python app.py
+xattr -rd com.apple.quarantine "/Applications/KSP GameStats.app"
 ```
 
-Il server sarà disponibile su `http://localhost:5000`
+### Linux note
 
-### 2. Configura il path del file
+Make the AppImage executable after download:
 
-1. Apri il browser su `http://localhost:5000`
-2. Nella sezione "Configurazione Sistema", inserisci il path del tuo file persistent.sfs:
-   ```
-   /Users/sdipietr/Applications/Kerbal Space Program/saves/Conquer/persistent.sfs
-   ```
-3. Clicca su "Configura"
+```bash
+chmod +x KSP-GameStats-*.AppImage
+```
 
-### 3. Esegui il parsing
+---
 
-1. Clicca su "Avvia Parsing" per analizzare il file
-2. Attendi il completamento (il tempo dipende dalle dimensioni del file)
-3. I dati verranno salvati nel database SQLite
+## Quick Start
 
-### 4. Esplora le statistiche
+1. Open the app and go to the **Admin** tab
+2. Click **Browse…** (or type the full path) to select your `persistent.sfs` file — typically at:
+   - **macOS**: `~/Library/Application Support/Steam/steamapps/common/Kerbal Space Program/saves/<save-name>/persistent.sfs`
+   - **Windows**: `%ProgramFiles(x86)%\Steam\steamapps\common\Kerbal Space Program\saves\<save-name>\persistent.sfs`
+3. Click **Configure**, then **Start Parsing**
+4. Switch to the **Kerbals** or **Contracts** tab to explore your data
 
-- **Dashboard**: Visualizza statistiche generali (totale kerbals, voli, contratti, funds)
-- **Tab Astronauti**: Vedi i dettagli di ogni Kerbal con voli e destinazioni visitate
-- **Tab Contratti**: Analizza i contratti per tipologia con guadagni
+The database is stored automatically in:
+- macOS: `~/Library/Application Support/ksp-gamestat/ksp_stats.db`
+- Windows: `%APPDATA%\ksp-gamestat\ksp_stats.db`
+- Linux: `~/.config/ksp-gamestat/ksp_stats.db`
 
-## 🔄 Parsing Incrementale
+---
 
-Il sistema utilizza un hash MD5 del file per determinare se è necessario un nuovo parsing:
+## Development Setup
 
-- **Primo parsing**: Analizza tutto il file e salva nel database
-- **Parsing successivi**: Se il file non è cambiato, utilizza i dati in cache
-- **Force Refresh**: Usa il pulsante "Force Refresh" per forzare un nuovo parsing
+### Requirements
 
-## 📊 Struttura Database
+- Python 3.8+
+- Node.js 18+
+- npm
 
-### Tabella `kerbals`
-- `id`: ID univoco
-- `name`: Nome del Kerbal
-- `flights`: Numero di voli completati
-- `is_tourist`: Flag per identificare i turisti (esclusi dalle statistiche)
-- `last_updated`: Timestamp ultimo aggiornamento
+### Run in dev mode
 
-### Tabella `kerbal_locations`
-- `id`: ID univoco
-- `kerbal_id`: FK verso kerbals
-- `location`: Nome della destinazione
-- `visit_count`: Numero di visite
-- `last_updated`: Timestamp ultimo aggiornamento
+```bash
+# Clone
+git clone https://github.com/pinolallo/ksp-gamestat.git
+cd ksp-gamestat
 
-### Tabella `contracts`
-- `id`: ID univoco
-- `contract_type`: Tipologia contratto
-- `count`: Numero di contratti completati
-- `total_funds`: Guadagno totale
-- `last_updated`: Timestamp ultimo aggiornamento
+# Python backend
+python -m venv venv
+source venv/bin/activate          # Windows: venv\Scripts\activate
+pip install -r requirements.txt
 
-### Tabella `file_metadata`
-- `id`: ID univoco
-- `filepath`: Path del file .sfs
-- `file_hash`: Hash MD5 del file
-- `last_parsed`: Timestamp ultimo parsing
-- `parse_count`: Numero di parsing eseguiti
+# Node / Electron
+npm install
 
-## 🎨 Design
+# Build the backend binary (required before npm start)
+npm run build:backend             # Windows: npm run build:backend:win
 
-L'interfaccia utilizza:
+# Launch
+npm start
+```
 
-- **Font**: Orbitron (display) e IBM Plex Mono (body)
-- **Tema**: Space-themed con palette blu/cyan e accenti arancio
-- **Animazioni**: Starfield animato, hover effects, transizioni fluide
-- **Responsive**: Ottimizzato per desktop e mobile
+The Flask server also runs standalone for browser-based development:
 
-## 🛠️ Architettura
+```bash
+python app.py                     # Opens at http://localhost:4999
+```
+
+### Build installers
+
+```bash
+npm run build:mac     # macOS DMG (requires macOS)
+npm run build:win     # Windows NSIS installer (requires Windows)
+npm run build:linux   # Linux AppImage + deb (requires Linux)
+```
+
+### Project Structure
 
 ```
 ksp-gamestat/
-├── app.py                 # Backend Flask con API REST
-├── sfs_parser.py          # Parser del file .sfs
-├── database.py            # Database manager SQLite
-├── requirements.txt       # Dipendenze Python
-├── ksp_stats.db          # Database SQLite (generato)
-├── static/
-│   ├── index.html        # Interfaccia principale
-│   ├── styles.css        # Stili CSS
-│   └── app.js            # JavaScript frontend
-└── README.md             # Questo file
+├── app.py                  Flask REST API (port configurable via KSP_PORT)
+├── sfs_parser.py           KSP .sfs save-file parser
+├── database.py             SQLite manager
+├── requirements.txt        Python dependencies (Flask, flask-cors)
+├── ksp_gamestat.spec       PyInstaller build spec
+├── package.json            Electron + electron-builder config
+├── electron/
+│   ├── main.js             Electron main process: spawn backend, IPC, window
+│   └── preload.js          Context bridge (native file picker)
+├── build/                  App icons and macOS entitlements
+├── .github/workflows/
+│   └── build.yml           CI matrix: mac (arm64+x64), win, linux
+└── static/
+    ├── index.html          Single-page application
+    ├── app.js              Frontend logic (vanilla JS, no framework)
+    ├── styles.css          Space-themed CSS
+    └── fonts/              Bundled Orbitron + IBM Plex Mono (offline)
 ```
 
-## 🔍 API Endpoints
+---
 
-- `GET /api/config` - Ottieni configurazione corrente
-- `POST /api/config` - Configura path file .sfs
-- `POST /api/parse` - Esegui parsing del file
-- `GET /api/summary` - Statistiche riassuntive
-- `GET /api/kerbals` - Lista tutti i Kerbals
-- `GET /api/kerbals/<name>` - Dettagli singolo Kerbal
-- `GET /api/contracts` - Lista contratti per tipologia
-- `GET /api/health` - Health check
+## API Reference
 
-## 🐛 Troubleshooting
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/config` | Current configuration |
+| POST | `/api/config` | Set the `persistent.sfs` path |
+| POST | `/api/parse` | Parse the save file (supports `{"force": true}`) |
+| GET | `/api/summary` | Top-level stats (kerbals, flights, contracts, funds) |
+| GET | `/api/kerbals` | All kerbals (tourists excluded) |
+| GET | `/api/kerbals/<name>` | Single kerbal detail |
+| GET | `/api/contracts` | Contracts aggregated by type |
+| GET | `/api/contracts/progress` | Progression timeline data (optional `?type=` filter) |
+| GET | `/api/health` | Health check |
+| GET | `/api/system-info` | DB size and parse history |
 
-### Il parsing è lento
-- Il parsing di file da 98MB può richiedere alcuni minuti
-- Il sistema utilizza parsing incrementale per ottimizzare i parsing successivi
+---
 
-### Errore "File not found"
-- Verifica che il path del file .sfs sia corretto
-- Usa il path assoluto completo
-- Assicurati che il file esista e sia leggibile
+## CI / CD
 
-### Database corrotto
-- Elimina il file `ksp_stats.db` e riavvia l'applicazione
-- Il database verrà ricreato automaticamente
+GitHub Actions builds the app on every version tag (`v*`). Four runners produce native binaries for each platform; a draft GitHub Release is created automatically with all artifacts.
 
-## 📝 Note Tecniche
+To publish a new release:
 
-- **Encoding**: Il parser gestisce file UTF-8 con fallback su errori
-- **Performance**: Lettura in chunks per file grandi (8KB)
-- **Memoria**: Parser efficiente con uso minimo di memoria
-- **Concorrenza**: Non supportata - esegui un parsing alla volta
+```bash
+git tag v1.1.0
+git push origin v1.1.0
+```
 
-## 🎯 Funzionalità Future
+Then review and publish the draft release on GitHub.
 
-- [ ] Export dati in CSV/JSON
-- [ ] Grafici interattivi con Chart.js
-- [ ] Comparazione tra diverse save
-- [ ] Tracking progressi nel tempo
-- [ ] Filtri avanzati per Kerbals e contratti
-- [ ] API per integrazioni esterne
+---
 
-## 👨‍💻 Sviluppo
+## Troubleshooting
 
-Per contribuire o modificare:
+**Parsing is slow** — files over 50 MB can take a minute or two on first parse. Subsequent parses skip unchanged files automatically.
 
-1. Il parsing è gestito in `sfs_parser.py`
-2. La logica database è in `database.py`
-3. L'API REST è in `app.py`
-4. Il frontend è in `static/`
+**"File not found"** — use the absolute path to `persistent.sfs`; verify the file exists and is readable.
 
-## 📄 Licenza
+**Database issues** — delete `ksp_stats.db` from the user-data directory and re-parse. The schema is recreated automatically.
 
-Questo progetto è fornito "as-is" per uso personale.
+**Backend does not start (dev mode)** — make sure `npm run build:backend` completed successfully and `dist_pyinstaller/ksp-gamestat-server/` exists.
 
-## 🚀 Buon volo!
+---
 
-Che i tuoi Kerbals tornino sempre a casa! 🌍→🌙→🏠
+## License
+
+MIT — see [LICENSE](LICENSE) for details.
+
+---
+
+*May your Kerbals always make it home.* 🚀

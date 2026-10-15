@@ -1,6 +1,6 @@
 """
-Backend Flask per KSP GameStats
-API REST per accedere alle statistiche di gioco
+KSP GameStats — Flask backend
+REST API for KSP save-file statistics
 """
 
 from flask import Flask, jsonify, request, send_from_directory
@@ -27,7 +27,7 @@ CORS(app)
 
 db = DatabaseManager(DB_PATH)
 
-# Path del file persistent.sfs — env var > last DB record > empty
+# persistent.sfs path — env var > last DB record > empty
 def _load_sfs_path() -> str:
     env = os.environ.get('KSP_SFS_PATH', '')
     if env:
@@ -48,13 +48,13 @@ SFS_FILE_PATH = _load_sfs_path()
 
 @app.route('/')
 def index():
-    """Serve la pagina principale"""
+    """Serve the main page"""
     return send_from_directory('static', 'index.html')
 
 
 @app.route('/api/config', methods=['GET'])
 def get_config():
-    """Ritorna la configurazione corrente"""
+    """Return current configuration"""
     return jsonify({
         'sfs_path': SFS_FILE_PATH,
         'db_path': DB_PATH,
@@ -64,7 +64,7 @@ def get_config():
 
 @app.route('/api/config', methods=['POST'])
 def set_config():
-    """Imposta il path del file persistent.sfs"""
+    """Set the persistent.sfs file path"""
     global SFS_FILE_PATH
     data = request.json
     
@@ -86,8 +86,8 @@ def set_config():
 @app.route('/api/parse', methods=['POST'])
 def parse_file():
     """
-    Esegue il parsing del file persistent.sfs
-    Supporta parsing incrementale basato su hash del file
+    Parse the persistent.sfs file.
+    Supports incremental parsing: skips re-parse when the file hash is unchanged.
     """
     if not SFS_FILE_PATH:
         return jsonify({'error': 'SFS file path not configured'}), 400
@@ -98,7 +98,6 @@ def parse_file():
     try:
         parser = SFSParser(SFS_FILE_PATH)
         
-        # Calcola hash per verificare se serve parsing
         current_hash = parser.calculate_file_hash()
         
         force_parse = request.json.get('force', False) if request.json else False
@@ -111,18 +110,15 @@ def parse_file():
                 'file_hash': current_hash
             })
         
-        # Esegui parsing
         print(f"Parsing file: {SFS_FILE_PATH}")
         kerbals, contracts, contract_history, file_hash = parser.parse_all()
 
-        # Salva nel database
         print("Saving to database...")
         db.save_kerbals(kerbals)
         db.save_contracts(contracts)
         db.save_contract_history(contract_history)
         db.update_file_metadata(SFS_FILE_PATH, file_hash)
-        
-        # Statistiche del parsing
+
         stats = {
             'kerbals_parsed': len(kerbals),
             'contracts_parsed': len(contracts),
@@ -147,7 +143,7 @@ def parse_file():
 
 @app.route('/api/kerbals', methods=['GET'])
 def get_kerbals():
-    """Ritorna la lista di tutti i Kerbals (esclusi turisti)"""
+    """Return all kerbals (tourists excluded)"""
     try:
         kerbals = db.get_all_kerbals()
         return jsonify({
@@ -161,7 +157,7 @@ def get_kerbals():
 
 @app.route('/api/kerbals/<name>', methods=['GET'])
 def get_kerbal(name):
-    """Ritorna i dettagli di un singolo Kerbal"""
+    """Return details for a single kerbal"""
     try:
         kerbal = db.get_kerbal_by_name(name)
         if kerbal is None:
@@ -177,7 +173,7 @@ def get_kerbal(name):
 
 @app.route('/api/contracts', methods=['GET'])
 def get_contracts():
-    """Ritorna la lista di tutti i contratti"""
+    """Return all contracts aggregated by type"""
     try:
         contracts = db.get_all_contracts()
         return jsonify({
@@ -191,7 +187,7 @@ def get_contracts():
 
 @app.route('/api/summary', methods=['GET'])
 def get_summary():
-    """Ritorna statistiche riassuntive"""
+    """Return top-level summary statistics"""
     try:
         summary = db.get_summary_stats()
         return jsonify({
@@ -225,7 +221,7 @@ def get_contract_progress():
 
 @app.route('/api/system-info', methods=['GET'])
 def get_system_info():
-    """Ritorna informazioni di sistema per il pannello Admin"""
+    """Return system info for the Admin panel"""
     try:
         return jsonify({'success': True, 'info': db.get_system_info()})
     except Exception as e:
