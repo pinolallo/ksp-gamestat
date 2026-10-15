@@ -104,6 +104,7 @@ class DatabaseManager:
             ('is_badass',         'BOOLEAN DEFAULT 0'),
             ('current_location',  'TEXT DEFAULT ""'),
             ('current_vessel',    'TEXT DEFAULT ""'),
+            ('hired_ut',          'REAL DEFAULT 0'),
         ]:
             try:
                 cursor.execute(f'ALTER TABLE kerbals ADD COLUMN {col} {typedef}')
@@ -126,6 +127,12 @@ class DatabaseManager:
         ''')
         try:
             cursor.execute('ALTER TABLE contracts_history ADD COLUMN passengers INTEGER DEFAULT 0')
+        except Exception:
+            pass
+
+        # Migration: game_ut on file_metadata
+        try:
+            cursor.execute('ALTER TABLE file_metadata ADD COLUMN game_ut REAL DEFAULT 0')
         except Exception:
             pass
 
@@ -194,10 +201,10 @@ class DatabaseManager:
                     name, flights, is_tourist,
                     trait, state, experience_level, experience,
                     courage, stupidity, gender, veteran, is_badass,
-                    current_location, current_vessel,
+                    current_location, current_vessel, hired_ut,
                     last_updated
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 ON CONFLICT(name) DO UPDATE SET
                     flights = excluded.flights,
                     is_tourist = excluded.is_tourist,
@@ -212,12 +219,14 @@ class DatabaseManager:
                     is_badass = excluded.is_badass,
                     current_location = excluded.current_location,
                     current_vessel = excluded.current_vessel,
+                    hired_ut = excluded.hired_ut,
                     last_updated = CURRENT_TIMESTAMP
             ''', (name, stats.flights, stats.is_tourist,
                   stats.trait, stats.state, stats.experience_level, stats.experience,
                   stats.courage, stats.stupidity, stats.gender,
                   stats.veteran, stats.is_badass,
-                  stats.current_location, stats.current_vessel))
+                  stats.current_location, stats.current_vessel,
+                  stats.hired_ut))
             
             # Get the kerbal's row ID
             cursor.execute('SELECT id FROM kerbals WHERE name = ?', (name,))
@@ -390,6 +399,7 @@ class DatabaseManager:
                 'is_badass': bool(row['is_badass']),
                 'current_location': row['current_location'] or '',
                 'current_vessel': row['current_vessel'] or '',
+                'hired_ut': row['hired_ut'] or 0.0,
                 'last_updated': row['last_updated'],
                 'locations': []
             }
@@ -436,6 +446,7 @@ class DatabaseManager:
             'is_badass': bool(row['is_badass']),
             'current_location': row['current_location'] or '',
             'current_vessel': row['current_vessel'] or '',
+            'hired_ut': row['hired_ut'] or 0.0,
             'last_updated': row['last_updated'],
             'locations': []
         }
@@ -475,6 +486,15 @@ class DatabaseManager:
         
         return contracts
     
+    def save_game_ut(self, game_ut: float):
+        """Store the current game UT on the most recent file_metadata row."""
+        cursor = self.conn.cursor()
+        cursor.execute(
+            'UPDATE file_metadata SET game_ut = ? WHERE id = (SELECT MAX(id) FROM file_metadata)',
+            (game_ut,)
+        )
+        self.conn.commit()
+
     def get_summary_stats(self) -> Dict:
         """Recupera statistiche riassuntive"""
         cursor = self.conn.cursor()
@@ -499,17 +519,20 @@ class DatabaseManager:
         cursor.execute('SELECT COUNT(DISTINCT location) FROM kerbal_locations')
         unique_locations = cursor.fetchone()[0]
         
-        # Ultimo aggiornamento
-        cursor.execute('SELECT MAX(last_parsed) FROM file_metadata')
-        last_update = cursor.fetchone()[0]
-        
+        # Last update and game time
+        cursor.execute('SELECT last_parsed, game_ut FROM file_metadata ORDER BY last_parsed DESC LIMIT 1')
+        meta_row = cursor.fetchone()
+        last_update = meta_row[0] if meta_row else None
+        game_ut     = float(meta_row[1]) if meta_row and meta_row[1] else 0.0
+
         return {
             'total_kerbals': total_kerbals,
             'total_flights': total_flights,
             'total_contracts': total_contracts,
             'total_funds': total_funds,
             'unique_locations': unique_locations,
-            'last_update': last_update
+            'last_update': last_update,
+            'game_ut': game_ut,
         }
 
     def get_system_info(self) -> Dict:

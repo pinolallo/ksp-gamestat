@@ -1,10 +1,28 @@
 // API Base URL
 const API_BASE = '/api';
 
+// KSP time constants (seconds)
+const KSP_YEAR_S = 9203544;
+const KSP_DAY_S  = 21600;
+
+function kspDateStr(ut) {
+    const year = Math.floor(ut / KSP_YEAR_S) + 1;
+    const day  = Math.floor((ut % KSP_YEAR_S) / KSP_DAY_S) + 1;
+    return `Y${year} D${day}`;
+}
+
+function kspDurStr(seconds) {
+    if (seconds <= 0) return '—';
+    const years = Math.floor(seconds / KSP_YEAR_S);
+    const days  = Math.floor((seconds % KSP_YEAR_S) / KSP_DAY_S);
+    return years > 0 ? `${years}Y ${days}D` : `${days}D`;
+}
+
 // State
 let currentConfig = null;
 let kerbalsData = [];
 let contractsData = [];
+let gameUt = 0;
 
 // Kerbal roster lookup tables
 const TRAIT_BADGE = {
@@ -240,6 +258,7 @@ async function loadSummary() {
             if (summary.last_update) {
                 document.getElementById('lastUpdate').textContent = formatDate(summary.last_update);
             }
+            if (summary.game_ut) gameUt = summary.game_ut;
             
             document.getElementById('summaryPanel').style.display = 'block';
             document.getElementById('tabsNav').style.display = 'flex';
@@ -311,6 +330,21 @@ function renderKerbals(kerbals) {
                     <div class="kerbal-stat-value">${k.locations.length}</div>
                 </div>
             </div>
+            ${(() => {
+                if (k.veteran) {
+                    const svc = gameUt > 0 ? kspDurStr(gameUt) : '—';
+                    return `<div class="kerbal-stats-row kerbal-service-row">
+                        <div class="kerbal-stat"><div class="kerbal-stat-label">JOINED</div><div class="kerbal-stat-value kerbal-stat-sm">VETERAN</div></div>
+                        <div class="kerbal-stat"><div class="kerbal-stat-label">SERVICE</div><div class="kerbal-stat-value kerbal-stat-sm">${svc}</div></div>
+                    </div>`;
+                } else if (k.hired_ut > 0 && gameUt > 0) {
+                    return `<div class="kerbal-stats-row kerbal-service-row">
+                        <div class="kerbal-stat"><div class="kerbal-stat-label">JOINED</div><div class="kerbal-stat-value kerbal-stat-sm">${kspDateStr(k.hired_ut)}</div></div>
+                        <div class="kerbal-stat"><div class="kerbal-stat-label">SERVICE</div><div class="kerbal-stat-value kerbal-stat-sm">${kspDurStr(gameUt - k.hired_ut)}</div></div>
+                    </div>`;
+                }
+                return '';
+            })()}
             ${(k.current_location || k.current_vessel) ? `
             <div class="kerbal-current-location">
                 <span>📍</span>
@@ -548,6 +582,23 @@ function populateModal(k) {
             <div class="modal-stat-label">Level</div>
             <div class="modal-stat-value">${k.experience_level} / 5</div>
         </div>
+        ${k.veteran ? `
+        <div class="modal-stat">
+            <div class="modal-stat-label">Joined</div>
+            <div class="modal-stat-value">Veteran</div>
+        </div>
+        <div class="modal-stat">
+            <div class="modal-stat-label">Service</div>
+            <div class="modal-stat-value">${gameUt > 0 ? kspDurStr(gameUt) : '—'}</div>
+        </div>` : k.hired_ut > 0 && gameUt > 0 ? `
+        <div class="modal-stat">
+            <div class="modal-stat-label">Joined</div>
+            <div class="modal-stat-value">${kspDateStr(k.hired_ut)}</div>
+        </div>
+        <div class="modal-stat">
+            <div class="modal-stat-label">Service</div>
+            <div class="modal-stat-value">${kspDurStr(gameUt - k.hired_ut)}</div>
+        </div>` : ''}
     `;
 
     document.getElementById('modalBars').innerHTML = `

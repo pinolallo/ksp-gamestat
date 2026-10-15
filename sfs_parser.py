@@ -46,6 +46,8 @@ class KerbalStats:
     current_location: str = ''
     current_vessel: str = ''
 
+    hired_ut: float = 0.0  # UT (seconds) when rescued; 0.0 = veteran / unknown
+
     def add_location(self, location: str):
         """Aggiunge una visita a una location"""
         if location in self.locations:
@@ -517,24 +519,111 @@ class SFSParser:
 
         return records
 
-    def parse_all(self) -> Tuple[Dict[str, KerbalStats], Dict[str, ContractStats], List['ContractRecord'], str]:
+    def parse_rescue_dates(self, kerbals: Dict[str, KerbalStats]) -> float:
         """
-        Esegue il parsing completo del file
-        Returns: (kerbals_dict, contracts_dict, file_hash)
+        Single-pass scan that reads:
+          - FLIGHTSTATE.UT  → current game time (seconds)
+          - CONTRACT_FINISHED blocks of type RecoverAsset → rescue date per kerbal
+        Sets kerbals[name].hired_ut for each rescued non-veteran kerbal.
+        Returns the current game UT (0.0 if not found).
+        """
+        current_ut = 0.0
+
+        # FLIGHTSTATE tracking (local indent, reset when block found)
+        in_ft  = False
+        ft_lvl = 0
+
+        # CONTRACTS tracking
+        in_cts  = False
+        cts_lvl = 0
+        in_ct   = False
+        ct_type = ct_name = None
+        ct_ut   = 0.0
+
+        with open(self.filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                stripped = line.strip()
+
+                # ── Decrement ─────────────────────────────────────────────
+                if stripped.startswith('}'):
+                    if in_ft:
+                        ft_lvl -= 1
+                        if ft_lvl < 0:
+                            in_ft = False
+                    if in_ct:
+                        cts_lvl -= 1
+                        if cts_lvl == 1:        # CONTRACT_FINISHED block closed
+                            if ct_type == 'RecoverAsset' and ct_name and ct_ut > 0:
+                                if ct_name in kerbals and not kerbals[ct_name].veteran:
+                                    kerbals[ct_name].hired_ut = ct_ut
+                            ct_type = ct_name = None
+                            ct_ut = 0.0
+                            in_ct = False
+                    elif in_cts:
+                        cts_lvl -= 1
+                        if cts_lvl <= 0:
+                            in_cts = False
+
+                # ── Block detection ───────────────────────────────────────
+                if not in_ft and stripped == 'FLIGHTSTATE':
+                    in_ft = True;  ft_lvl = 0
+                elif not in_cts and stripped == 'CONTRACTS':
+                    in_cts = True; cts_lvl = 0
+                elif in_cts and not in_ct and stripped == 'CONTRACT_FINISHED':
+                    in_ct = True;  cts_lvl = 1
+
+                # ── Content reading ───────────────────────────────────────
+                if in_ft and ft_lvl == 1 and stripped.startswith('UT ='):
+                    try:
+                        current_ut = float(stripped.split('=', 1)[1].strip())
+                        in_ft = False           # found what we need
+                    except ValueError:
+                        pass
+
+                if in_ct and cts_lvl == 2:
+                    if stripped.startswith('type ='):
+                        ct_type = stripped.split('=', 1)[1].strip()
+                    elif stripped.startswith('kerbalName ='):
+                        ct_name = stripped.split('=', 1)[1].strip()
+                    elif stripped.startswith('values ='):
+                        try:
+                            vals = [float(v) for v in stripped.split('=', 1)[1].strip().split(',')]
+                            ct_ut = vals[8] if len(vals) > 8 else 0.0
+                        except (ValueError, IndexError):
+                            pass
+
+                # ── Increment ─────────────────────────────────────────────
+                if stripped.startswith('{'):
+                    if in_ft:
+                        ft_lvl  += 1
+                    if in_cts:
+                        cts_lvl += 1
+
+        return current_ut
+
+    def parse_all(self) -> Tuple[Dict[str, KerbalStats], Dict[str, ContractStats], List['ContractRecord'], str, float]:
+        """
+        Full parse of the save file.
+        Returns: (kerbals_dict, contracts_dict, contract_history, file_hash, game_ut)
         """
         file_hash = self.calculate_file_hash()
-        
+
         # Parse kerbals
         print("Parsing Kerbal roster...")
         kerbals = self.parse_kerbal_roster()
-        
-        # Parse flight logs
+
+        # Parse flight logs (CAREER_LOG + FLIGHT_LOG)
         print(f"Parsing flight logs for {len(kerbals)} kerbals...")
         kerbals = self.parse_flight_logs(kerbals)
 
         # Parse vessel assignments (current location + ship)
         print("Parsing vessel assignments...")
         self.parse_vessel_assignments(kerbals)
+
+        # Parse rescue dates and current game time
+        print("Parsing rescue dates...")
+        game_ut = self.parse_rescue_dates(kerbals)
+        print(f"Game UT: {game_ut:.0f}s")
 
         # Synthetic rating: sum(visit_count * body_tier) when save has no experienceLevel
         BODY_TIERS = {
@@ -558,11 +647,11 @@ class SFSParser:
         contract_history = self.parse_contract_history()
         print(f"Contract history: {len(contract_history)} records")
 
-        # Rimuovi turisti
+        # Remove tourists
         kerbals = {name: stats for name, stats in kerbals.items()
                    if not stats.is_tourist}
 
-        return kerbals, contracts, contract_history, file_hash
+        return kerbals, contracts, contract_history, file_hash, game_ut
 
 
 if __name__ == '__main__':

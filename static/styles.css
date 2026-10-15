@@ -1033,6 +1033,18 @@ body {
     color: var(--accent-cyan);
 }
 
+.kerbal-service-row {
+    grid-template-columns: repeat(2, 1fr);
+    margin-top: 0;
+    border-top: none;
+    padding-top: 0;
+}
+
+.kerbal-stat-sm {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
 /* ── Current Location + Vessel ──────────────────────────────── */
 .kerbal-current-location {
     display: flex;

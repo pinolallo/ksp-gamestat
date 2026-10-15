@@ -111,13 +111,14 @@ def parse_file():
             })
         
         print(f"Parsing file: {SFS_FILE_PATH}")
-        kerbals, contracts, contract_history, file_hash = parser.parse_all()
+        kerbals, contracts, contract_history, file_hash, game_ut = parser.parse_all()
 
         print("Saving to database...")
         db.save_kerbals(kerbals)
         db.save_contracts(contracts)
         db.save_contract_history(contract_history)
         db.update_file_metadata(SFS_FILE_PATH, file_hash)
+        db.save_game_ut(game_ut)
 
         stats = {
             'kerbals_parsed': len(kerbals),
