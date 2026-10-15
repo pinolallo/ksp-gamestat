@@ -1,0 +1,589 @@
+"""
+Parser incrementale per file .sfs di Kerbal Space Program
+Gestisce file grandi (98MB+) con parsing efficiente e incrementale
+"""
+
+import re
+import hashlib
+from typing import Dict, List, Any, Optional, Tuple
+from dataclasses import dataclass, field
+from datetime import datetime
+
+
+KSP_YEAR_SECONDS = 9203544   # Kerbin orbital period (s)
+KSP_DAY_SECONDS  = 21600     # 6 h/day
+
+def ut_to_ksp_date(ut: float):
+    year = int(ut / KSP_YEAR_SECONDS) + 1
+    day  = int((ut % KSP_YEAR_SECONDS) / KSP_DAY_SECONDS) + 1
+    return year, day
+
+
+BODY_NAMES = {
+    0: 'Sun', 1: 'Kerbin', 2: 'Mun', 3: 'Minmus', 4: 'Moho',
+    5: 'Eve', 6: 'Duna', 7: 'Ike', 8: 'Jool', 9: 'Laythe',
+    10: 'Vall', 11: 'Bop', 12: 'Tylo', 13: 'Gilly',
+    14: 'Pol', 15: 'Dres', 16: 'Eeloo',
+}
+
+
+@dataclass
+class KerbalStats:
+    """Statistiche per un singolo Kerbal"""
+    name: str
+    flights: int = 0
+    locations: Dict[str, int] = field(default_factory=dict)  # location -> count
+    is_tourist: bool = False
+    trait: str = ''
+    state: str = 'Available'
+    experience_level: int = 0
+    experience: float = 0.0
+    courage: float = 0.0
+    stupidity: float = 0.0
+    gender: str = 'Male'
+    veteran: bool = False
+    is_badass: bool = False
+    current_location: str = ''
+    current_vessel: str = ''
+
+    def add_location(self, location: str):
+        """Aggiunge una visita a una location"""
+        if location in self.locations:
+            self.locations[location] += 1
+        else:
+            self.locations[location] = 1
+
+
+@dataclass
+class ContractRecord:
+    """Single completed contract with timestamp, for progression charting"""
+    contract_type: str
+    prestige: int = 0       # 0=Trivial 1=Significant 2=Exceptional
+    body_name: str = ''
+    funds: float = 0.0
+    passengers: int = 0
+    date_ut: float = 0.0
+    ksp_year: int = 1
+    ksp_day: int = 1
+
+
+@dataclass
+class ContractStats:
+    """Statistiche per i contratti"""
+    contract_type: str
+    count: int = 0
+    total_funds: float = 0.0
+    passengers: int = 0
+
+    def add_contract(self, funds: float, tourists: int = 0):
+        self.count += 1
+        self.total_funds += funds
+        self.passengers += tourists
+
+
+class SFSParser:
+    """Parser per file .sfs con supporto per parsing incrementale"""
+    
+    def __init__(self, filepath: str):
+        self.filepath = filepath
+        self.file_hash: Optional[str] = None
+        
+    def calculate_file_hash(self) -> str:
+        """Calcola hash del file per rilevare modifiche"""
+        hasher = hashlib.md5()
+        with open(self.filepath, 'rb') as f:
+            # Leggi in chunks per file grandi
+            for chunk in iter(lambda: f.read(8192), b''):
+                hasher.update(chunk)
+        return hasher.hexdigest()
+    
+    def parse_kerbal_roster(self) -> Dict[str, KerbalStats]:
+        """Estrae informazioni sui Kerbal dal roster"""
+        kerbals = {}
+
+        with open(self.filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            in_roster = False
+            in_kerbal = False
+            current_name = None
+            current_type = None
+            current_trait = ''
+            current_state = 'Available'
+            current_experience_level = 0
+            current_experience = 0.0
+            current_courage = 0.0
+            current_stupidity = 0.0
+            current_gender = 'Male'
+            current_veteran = False
+            current_is_badass = False
+            indent_level = 0
+
+            for line in f:
+                stripped = line.strip()
+
+                if stripped.startswith('}'):
+                    indent_level -= 1
+                    if in_kerbal and indent_level == 1:
+                        is_tourist = (current_type == 'Tourist' or current_trait == 'Tourist')
+                        if current_name and not is_tourist:
+                            if current_name not in kerbals:
+                                kerbals[current_name] = KerbalStats(
+                                    name=current_name,
+                                    is_tourist=False,
+                                    trait=current_trait,
+                                    state=current_state,
+                                    experience_level=current_experience_level,
+                                    experience=current_experience,
+                                    courage=current_courage,
+                                    stupidity=current_stupidity,
+                                    gender=current_gender,
+                                    veteran=current_veteran,
+                                    is_badass=current_is_badass,
+                                )
+                        current_name = None
+                        current_type = None
+                        in_kerbal = False
+                    elif in_roster and indent_level == 0:
+                        in_roster = False
+
+                if stripped == 'ROSTER':
+                    in_roster = True
+                    indent_level = 0
+                elif in_roster and stripped == 'KERBAL':
+                    in_kerbal = True
+                    indent_level = 1
+                    current_name = None
+                    current_type = None
+                    current_trait = ''
+                    current_state = 'Available'
+                    current_experience_level = 0
+                    current_experience = 0.0
+                    current_courage = 0.0
+                    current_stupidity = 0.0
+                    current_gender = 'Male'
+                    current_veteran = False
+                    current_is_badass = False
+                elif in_kerbal and indent_level == 2:
+                    # Only read direct children of the KERBAL block
+                    if stripped.startswith('name ='):
+                        current_name = stripped.split('=', 1)[1].strip()
+                    elif stripped.startswith('type ='):
+                        current_type = stripped.split('=', 1)[1].strip()
+                    elif stripped.startswith('trait ='):
+                        current_trait = stripped.split('=', 1)[1].strip()
+                    elif stripped.startswith('state ='):
+                        current_state = stripped.split('=', 1)[1].strip()
+                    elif stripped.startswith('brave ='):
+                        try:
+                            current_courage = float(stripped.split('=', 1)[1].strip())
+                        except ValueError:
+                            pass
+                    elif stripped.startswith('dumb ='):
+                        try:
+                            current_stupidity = float(stripped.split('=', 1)[1].strip())
+                        except ValueError:
+                            pass
+                    elif stripped.startswith('experienceLevel ='):
+                        try:
+                            current_experience_level = int(stripped.split('=', 1)[1].strip())
+                        except ValueError:
+                            pass
+                    elif stripped.startswith('experience ='):
+                        try:
+                            current_experience = float(stripped.split('=', 1)[1].strip())
+                        except ValueError:
+                            pass
+                    elif stripped.startswith('gender ='):
+                        current_gender = stripped.split('=', 1)[1].strip()
+                    elif stripped.startswith('veteran ='):
+                        current_veteran = stripped.split('=', 1)[1].strip().lower() == 'true'
+                    elif stripped.startswith('badS ='):
+                        current_is_badass = stripped.split('=', 1)[1].strip().lower() == 'true'
+
+                if stripped.startswith('{'):
+                    indent_level += 1
+
+        return kerbals
+    
+    def parse_flight_logs(self, kerbals: Dict[str, KerbalStats]) -> Dict[str, KerbalStats]:
+        """Analizza i flight log per contare voli e destinazioni"""
+        with open(self.filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            in_roster = False
+            in_kerbal = False
+            in_flight_log = False
+            current_kerbal_name = None
+            indent_level = 0
+
+            for line in f:
+                stripped = line.strip()
+
+                if stripped.startswith('}'):
+                    indent_level -= 1
+                    if in_flight_log and indent_level == 2:
+                        in_flight_log = False
+                    elif in_kerbal and indent_level == 1:
+                        in_kerbal = False
+                        current_kerbal_name = None
+                    elif in_roster and indent_level == 0:
+                        in_roster = False
+
+                if stripped == 'ROSTER':
+                    in_roster = True
+                    indent_level = 0
+                elif in_roster and stripped == 'KERBAL':
+                    in_kerbal = True
+                    indent_level = 1
+                    current_kerbal_name = None
+                elif in_kerbal and not in_flight_log and indent_level == 2:
+                    if stripped.startswith('name ='):
+                        current_kerbal_name = stripped.split('=', 1)[1].strip()
+                    elif stripped == 'FLIGHT_LOG':
+                        in_flight_log = True
+                elif in_flight_log:
+                    if stripped.startswith('flight ='):
+                        try:
+                            count = int(stripped.split('=', 1)[1].strip())
+                            if current_kerbal_name and current_kerbal_name in kerbals:
+                                kerbals[current_kerbal_name].flights = count
+                        except ValueError:
+                            pass
+                    elif '=' in stripped:
+                        # Format: "N = EventType,Location"
+                        key, _, value = stripped.partition('=')
+                        if key.strip().isdigit() and ',' in value:
+                            _, _, location = value.strip().partition(',')
+                            location = location.strip()
+                            if location and current_kerbal_name and current_kerbal_name in kerbals:
+                                kerbals[current_kerbal_name].add_location(location)
+
+                if stripped.startswith('{'):
+                    indent_level += 1
+
+        return kerbals
+    
+    def parse_vessel_assignments(self, kerbals: Dict[str, KerbalStats]) -> None:
+        """Determines current location and vessel for each assigned Kerbal"""
+        location_map: Dict[str, str] = {}
+        vessel_map: Dict[str, str] = {}
+
+        with open(self.filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            in_vessel = False
+            vessel_base_depth = 0
+            abs_indent = 0
+            in_orbit = False
+            v_name = None
+            v_sit = None
+            v_landed_at = None
+            v_orbit_ref = None
+            crew_names: set = set()
+
+            for line in f:
+                stripped = line.strip()
+
+                if stripped.startswith('}'):
+                    abs_indent -= 1
+
+                    if in_orbit and abs_indent == vessel_base_depth:
+                        in_orbit = False
+
+                    if in_vessel and abs_indent == vessel_base_depth - 1:
+                        if crew_names:
+                            sit = v_sit or ''
+                            ref_body = BODY_NAMES.get(v_orbit_ref, 'Unknown') if v_orbit_ref is not None else 'Unknown'
+                            if sit in ('LANDED', 'PRELAUNCH'):
+                                body_name = v_landed_at if v_landed_at else ref_body
+                                loc = f"{body_name} (landed)"
+                            elif sit == 'SPLASHED':
+                                body_name = v_landed_at if v_landed_at else ref_body
+                                loc = f"{body_name} (splashed)"
+                            elif sit == 'ORBITING':
+                                loc = f"Orbiting {ref_body}"
+                            elif sit == 'SUB_ORBITAL':
+                                loc = f"Sub-orbital ({ref_body})"
+                            elif sit == 'ESCAPING':
+                                loc = f"Escaping {ref_body}"
+                            else:
+                                loc = sit or 'Unknown'
+                            for cname in crew_names:
+                                location_map[cname] = loc
+                                vessel_map[cname] = v_name or ''
+                        in_vessel = False
+                        in_orbit = False
+                        v_name = v_sit = v_landed_at = v_orbit_ref = None
+                        crew_names = set()
+
+                if not in_vessel and stripped == 'VESSEL':
+                    in_vessel = True
+                    vessel_base_depth = abs_indent + 1
+                    v_name = v_sit = v_landed_at = v_orbit_ref = None
+                    in_orbit = False
+                    crew_names = set()
+
+                if in_vessel:
+                    if abs_indent == vessel_base_depth:
+                        if stripped.startswith('name =') and v_name is None:
+                            v_name = stripped.split('=', 1)[1].strip()
+                        elif stripped.startswith('sit ='):
+                            v_sit = stripped.split('=', 1)[1].strip()
+                        elif stripped.startswith('landedAt ='):
+                            val = stripped.split('=', 1)[1].strip()
+                            if val:
+                                v_landed_at = val
+                        elif stripped == 'ORBIT' and not in_orbit:
+                            in_orbit = True
+
+                    if in_orbit and abs_indent == vessel_base_depth + 1:
+                        if stripped.startswith('REF ='):
+                            try:
+                                v_orbit_ref = int(stripped.split('=', 1)[1].strip())
+                            except ValueError:
+                                pass
+
+                    if abs_indent > vessel_base_depth and stripped.startswith('crew ='):
+                        candidate = stripped.split('=', 1)[1].strip()
+                        if candidate in kerbals:
+                            crew_names.add(candidate)
+
+                if stripped.startswith('{'):
+                    abs_indent += 1
+
+        for kerbal_name, kerbal in kerbals.items():
+            if kerbal.state == 'Available':
+                kerbal.current_location = 'Kerbin (KSC)'
+                kerbal.current_vessel = ''
+            elif kerbal.state == 'Assigned':
+                kerbal.current_location = location_map.get(kerbal_name, 'Unknown')
+                kerbal.current_vessel = vessel_map.get(kerbal_name, '')
+            elif kerbal.state == 'Dead':
+                kerbal.current_location = 'N/A'
+                kerbal.current_vessel = ''
+            else:
+                kerbal.current_location = 'Unknown'
+                kerbal.current_vessel = ''
+
+    def parse_contracts(self) -> Dict[str, ContractStats]:
+        """Estrae statistiche sui contratti completati"""
+        contracts = {}
+
+        with open(self.filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            in_contracts = False
+            in_contract = False
+            current_type = None
+            current_funds = 0.0
+            current_state = None
+            current_tourists = 0
+            indent_level = 0
+
+            for line in f:
+                stripped = line.strip()
+
+                if stripped.startswith('}'):
+                    indent_level -= 1
+                    if in_contract and indent_level == 1:
+                        if current_type and current_state == 'Completed':
+                            if current_type not in contracts:
+                                contracts[current_type] = ContractStats(contract_type=current_type)
+                            contracts[current_type].add_contract(current_funds, current_tourists)
+                        current_type = None
+                        current_funds = 0.0
+                        current_state = None
+                        current_tourists = 0
+                        in_contract = False
+                    elif in_contracts and indent_level == 0:
+                        in_contracts = False
+
+                if stripped == 'CONTRACTS':
+                    in_contracts = True
+                    indent_level = 0
+                elif in_contracts and stripped == 'CONTRACT_FINISHED':
+                    in_contract = True
+                    indent_level = 1
+                    current_tourists = 0
+                elif in_contract and indent_level == 2:
+                    # Only read direct children of CONTRACT_FINISHED
+                    if stripped.startswith('type ='):
+                        current_type = stripped.split('=', 1)[1].strip()
+                    elif stripped.startswith('state ='):
+                        current_state = stripped.split('=', 1)[1].strip()
+                    elif stripped.startswith('values ='):
+                        try:
+                            vals = [float(v) for v in stripped.split('=', 1)[1].strip().split(',')]
+                            current_funds = vals[4] if len(vals) > 4 else 0.0
+                        except (ValueError, IndexError):
+                            current_funds = 0.0
+                    elif stripped.startswith('tourists ='):
+                        names = stripped.split('=', 1)[1].strip()
+                        current_tourists = len([n for n in names.split('|') if n.strip()])
+
+                if stripped.startswith('{'):
+                    indent_level += 1
+
+        return contracts
+    
+    def parse_contract_history(self) -> List['ContractRecord']:
+        """Returns one ContractRecord per completed contract (for timeline/progression)."""
+        records: List[ContractRecord] = []
+
+        with open(self.filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            in_contracts = False
+            in_contract  = False
+            current_type = None
+            current_prestige = 0
+            current_body = ''
+            current_funds = 0.0
+            current_passengers = 0
+            current_date_ut = 0.0
+            current_state = None
+            indent_level = 0
+
+            for line in f:
+                stripped = line.strip()
+
+                if stripped.startswith('}'):
+                    indent_level -= 1
+                    if in_contract and indent_level == 1:
+                        if current_type and current_state == 'Completed' and current_date_ut > 0:
+                            year, day = ut_to_ksp_date(current_date_ut)
+                            records.append(ContractRecord(
+                                contract_type=current_type,
+                                prestige=current_prestige,
+                                body_name=current_body,
+                                funds=current_funds,
+                                passengers=current_passengers,
+                                date_ut=current_date_ut,
+                                ksp_year=year,
+                                ksp_day=day,
+                            ))
+                        current_type = None
+                        current_prestige = 0
+                        current_body = ''
+                        current_funds = 0.0
+                        current_passengers = 0
+                        current_date_ut = 0.0
+                        current_state = None
+                        in_contract = False
+                    elif in_contracts and indent_level == 0:
+                        in_contracts = False
+
+                if stripped == 'CONTRACTS':
+                    in_contracts = True
+                    indent_level = 0
+                elif in_contracts and stripped == 'CONTRACT_FINISHED':
+                    in_contract = True
+                    indent_level = 1
+                elif in_contract and indent_level == 2:
+                    if stripped.startswith('type ='):
+                        current_type = stripped.split('=', 1)[1].strip()
+                    elif stripped.startswith('state ='):
+                        current_state = stripped.split('=', 1)[1].strip()
+                    elif stripped.startswith('prestige ='):
+                        try:
+                            current_prestige = int(stripped.split('=', 1)[1].strip())
+                        except ValueError:
+                            pass
+                    elif stripped.startswith('bodyName ='):
+                        current_body = stripped.split('=', 1)[1].strip()
+                    elif stripped.startswith('targetBody ='):
+                        if not current_body:
+                            try:
+                                ref = int(stripped.split('=', 1)[1].strip())
+                                current_body = BODY_NAMES.get(ref, '')
+                            except ValueError:
+                                pass
+                    elif stripped.startswith('values ='):
+                        try:
+                            vals = [float(v) for v in stripped.split('=', 1)[1].strip().split(',')]
+                            current_funds   = vals[4] if len(vals) > 4 else 0.0
+                            current_date_ut = vals[8] if len(vals) > 8 else 0.0
+                        except (ValueError, IndexError):
+                            pass
+                    elif stripped.startswith('tourists ='):
+                        names = stripped.split('=', 1)[1].strip()
+                        current_passengers = len([n for n in names.split('|') if n.strip()])
+
+                if stripped.startswith('{'):
+                    indent_level += 1
+
+        return records
+
+    def parse_all(self) -> Tuple[Dict[str, KerbalStats], Dict[str, ContractStats], List['ContractRecord'], str]:
+        """
+        Esegue il parsing completo del file
+        Returns: (kerbals_dict, contracts_dict, file_hash)
+        """
+        # Calcola hash per tracking delle modifiche
+        file_hash = self.calculate_file_hash()
+        
+        # Parse kerbals
+        print("Parsing Kerbal roster...")
+        kerbals = self.parse_kerbal_roster()
+        
+        # Parse flight logs
+        print(f"Parsing flight logs for {len(kerbals)} kerbals...")
+        kerbals = self.parse_flight_logs(kerbals)
+
+        # Parse vessel assignments (current location + ship)
+        print("Parsing vessel assignments...")
+        self.parse_vessel_assignments(kerbals)
+
+        # Synthetic rating: sum(visit_count * body_tier) when save has no experienceLevel
+        BODY_TIERS = {
+            'Sun':1,'Kerbin':1,'Mun':2,'Minmus':3,'Gilly':4,'Eve':5,
+            'Duna':6,'Ike':4,'Moho':7,'Dres':5,'Eeloo':8,
+            'Jool':8,'Laythe':7,'Tylo':7,'Vall':6,'Bop':5,'Pol':5,
+        }
+        for kerbal in kerbals.values():
+            if kerbal.experience == 0.0 and kerbal.locations:
+                kerbal.experience = sum(
+                    cnt * BODY_TIERS.get(loc, 1)
+                    for loc, cnt in kerbal.locations.items()
+                )
+
+        # Parse contracts (aggregated by type)
+        print("Parsing contracts...")
+        contracts = self.parse_contracts()
+
+        # Parse individual contract records (for progression timeline)
+        print("Parsing contract history...")
+        contract_history = self.parse_contract_history()
+        print(f"Contract history: {len(contract_history)} records")
+
+        # Rimuovi turisti
+        kerbals = {name: stats for name, stats in kerbals.items()
+                   if not stats.is_tourist}
+
+        return kerbals, contracts, contract_history, file_hash
+
+
+if __name__ == '__main__':
+    # Test del parser
+    import sys
+    
+    if len(sys.argv) < 2:
+        print("Usage: python sfs_parser.py <path_to_persistent.sfs>")
+        sys.exit(1)
+    
+    parser = SFSParser(sys.argv[1])
+    kerbals, contracts, file_hash = parser.parse_all()
+    
+    print(f"\n=== File Hash: {file_hash} ===\n")
+    
+    print(f"=== Kerbals ({len(kerbals)}) ===")
+    for name, stats in sorted(kerbals.items()):
+        print(f"\n{name}:")
+        print(f"  Flights: {stats.flights}")
+        print(f"  Destinations:")
+        for loc, count in sorted(stats.locations.items(), key=lambda x: x[1], reverse=True):
+            print(f"    - {loc}: {count} times")
+
+    print(f"\n=== Contracts by Type ===")
+    total_contracts = sum(c.count for c in contracts.values())
+    total_funds = sum(c.total_funds for c in contracts.values())
+
+    for ctype, stats in sorted(contracts.items(), key=lambda x: x[1].total_funds, reverse=True):
+        print(f"\n{ctype}:")
+        print(f"  Count: {stats.count}")
+        print(f"  Total funds: {stats.total_funds:,.2f} Funds")
+
+    print(f"\n=== Totals ===")
+    print(f"Completed contracts: {total_contracts}")
+    print(f"Total funds: {total_funds:,.2f} Funds")

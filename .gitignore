@@ -1,0 +1,32 @@
+# Build outputs
+dist/
+dist_pyinstaller/
+build/*.blockmap
+build/ksp_gamestat/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+*.spec.bak
+
+# Electron / Node
+node_modules/
+
+# Runtime DB (dev)
+*.db
+*.db-journal
+
+# macOS
+.DS_Store
+*.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp

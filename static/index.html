@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KSP GameStats • Mission Control</title>
+    <style>
+        @font-face { font-family:'Orbitron'; font-weight:400; font-style:normal; font-display:swap; src:url('/static/fonts/Orbitron-latin.woff2') format('woff2'); }
+        @font-face { font-family:'Orbitron'; font-weight:700; font-style:normal; font-display:swap; src:url('/static/fonts/Orbitron-latin.woff2') format('woff2'); }
+        @font-face { font-family:'Orbitron'; font-weight:900; font-style:normal; font-display:swap; src:url('/static/fonts/Orbitron-latin.woff2') format('woff2'); }
+        @font-face { font-family:'IBM Plex Mono'; font-weight:300; font-style:normal; font-display:swap; src:url('/static/fonts/IBMPlexMono-Light-latin.woff2') format('woff2'); }
+        @font-face { font-family:'IBM Plex Mono'; font-weight:400; font-style:normal; font-display:swap; src:url('/static/fonts/IBMPlexMono-Regular-latin.woff2') format('woff2'); }
+        @font-face { font-family:'IBM Plex Mono'; font-weight:600; font-style:normal; font-display:swap; src:url('/static/fonts/IBMPlexMono-SemiBold-latin.woff2') format('woff2'); }
+    </style>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <!-- Starfield background -->
+    <div class="starfield">
+        <div class="stars"></div>
+        <div class="stars2"></div>
+        <div class="stars3"></div>
+    </div>
+
+    <!-- Main container -->
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <div class="logo-icon">🚀</div>
+                    <div class="logo-text">
+                        <h1>KSP GameStats</h1>
+                        <p class="subtitle">Mission Control Dashboard</p>
+                    </div>
+                </div>
+                <div class="mission-clock" id="missionClock">
+                    MET: <span id="clockTime">00:00:00</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Summary Stats -->
+        <section class="summary-panel" id="summaryPanel" style="display: none;">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">👨‍🚀</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Kerbals</div>
+                        <div class="stat-value" id="totalKerbals">-</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🚀</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Total Flights</div>
+                        <div class="stat-value" id="totalFlights">-</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📋</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Contracts</div>
+                        <div class="stat-value" id="totalContracts">-</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">💰</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Funds Totali</div>
+                        <div class="stat-value" id="totalFunds">-</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🌍</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Destinations</div>
+                        <div class="stat-value" id="uniqueLocations">-</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🕐</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Last Updated</div>
+                        <div class="stat-value stat-small" id="lastUpdate">-</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tabs Navigation -->
+        <nav class="tabs-nav" id="tabsNav" style="display: none;">
+            <button class="tab-btn active" data-tab="kerbals" onclick="showTab('kerbals', this)">
+                👨‍🚀 Kerbals
+            </button>
+            <button class="tab-btn" data-tab="contracts" onclick="showTab('contracts', this)">
+                📋 Contracts
+            </button>
+            <button class="tab-btn tab-btn-admin" data-tab="admin" onclick="showTab('admin', this)">
+                ⚙️ Admin
+            </button>
+        </nav>
+
+        <!-- Kerbals Tab -->
+        <section class="tab-content active" id="kerbalsTab">
+            <div class="panel-header">
+                <div class="roster-title-row">
+                    <h2>👨‍🚀 Kerbal Roster</h2>
+                    <div class="roster-counter">
+                        <span id="rosterShowing">0</span>
+                        <span class="counter-label">SHOWING</span>
+                        /
+                        <span id="rosterTotal">0</span>
+                        <span class="counter-label">TOTAL</span>
+                    </div>
+                </div>
+                <div class="roster-controls">
+                    <div class="control-group">
+                        <label class="control-label">🔍 SEARCH KERBAL</label>
+                        <input type="text" id="kerbalSearch" placeholder="Type name..."
+                               class="input-field" oninput="applyFilters()">
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label">⚡ SORT BY</label>
+                        <select id="kerbalSortSelect" class="filter-select" onchange="applyFilters()">
+                            <option value="rating">⭐ Rating (Highest First)</option>
+                            <option value="rating_asc">⭐ Rating (Lowest First)</option>
+                            <option value="flights">🚀 Flights (Highest First)</option>
+                            <option value="name">🔤 Name A→Z</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label">🌍 FILTER BY LOCATION</label>
+                        <input type="text" id="locationFilter" placeholder="Type location name..."
+                               class="input-field" oninput="applyFilters()">
+                    </div>
+                </div>
+            </div>
+            <div class="kerbals-grid" id="kerbalsGrid">
+                <!-- Kerbals cards will be populated here -->
+            </div>
+        </section>
+
+        <!-- Contracts Tab -->
+        <section class="tab-content" id="contractsTab">
+            <div class="panel-header">
+                <h2>📋 Contract Statistics</h2>
+            </div>
+
+            <!-- Progress Dashboard -->
+            <div class="progress-dashboard" id="contractProgress" style="display:none;">
+
+                <!-- Row 1: prestige tiles -->
+                <div class="progress-tiles" id="prestigeTiles"></div>
+
+                <!-- Row 2: cumulative earnings chart -->
+                <div class="progress-chart-wrap">
+                    <div class="chart-title">💰 Cumulative Earnings</div>
+                    <div class="chart-container" id="earningsChart"></div>
+                </div>
+
+                <!-- Row 3: earnings per period -->
+                <div class="progress-chart-wrap">
+                    <div class="chart-title">💰 Earnings per Period</div>
+                    <div class="chart-container" id="earningsPerPeriodChart"></div>
+                </div>
+
+                <!-- Row 4: activity bars + top bodies -->
+                <div class="progress-row-2">
+                    <div class="progress-chart-wrap">
+                        <div class="chart-title">📋 Contracts per Period</div>
+                        <div class="chart-container" id="activityChart"></div>
+                    </div>
+                    <div class="progress-chart-wrap">
+                        <div class="chart-title">🌍 Top Destinations</div>
+                        <div id="bodyBreakdown"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detail Table -->
+            <div class="panel-header" style="margin-top:1rem;">
+                <h3 style="font-size:1rem;color:var(--text-secondary);">Breakdown by Type</h3>
+            </div>
+            <div class="contracts-table-container">
+                <table class="contracts-table" id="contractsTable">
+                    <thead>
+                        <tr>
+                            <th>Contract Type</th>
+                            <th>Count</th>
+                            <th>Total Earnings</th>
+                            <th>Avg per Contract</th>
+                        </tr>
+                    </thead>
+                    <tbody id="contractsTableBody">
+                        <!-- Contracts will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        <!-- Admin Tab -->
+        <section class="tab-content" id="adminTab">
+            <!-- Sub-section 1: System Configuration -->
+            <div class="admin-section">
+                <div class="panel-header">
+                    <h2>⚙️ System Configuration</h2>
+                </div>
+                <div class="config-status" id="configStatus">
+                    <div class="status-indicator" id="statusIndicator">⚠️</div>
+                    <span id="statusText">persistent.sfs file not configured</span>
+                </div>
+                <div class="config-form">
+                    <label for="sfsPath">Path to persistent.sfs:</label>
+                    <div class="input-group">
+                        <input
+                            type="text"
+                            id="sfsPath"
+                            placeholder="/Users/sdipietr/Applications/Kerbal Space Program/saves/Conquer/persistent.sfs"
+                            class="input-field"
+                        >
+                        <button id="browseBtn" onclick="browseForSfs()" class="btn btn-secondary" style="display:none">
+                            Browse…
+                        </button>
+                        <button onclick="configurePath()" class="btn btn-primary">
+                            Configure
+                        </button>
+                    </div>
+                    <p class="hint">Enter the full path to the persistent.sfs file of your save game</p>
+                </div>
+                <div class="parse-section" id="parseSection" style="display: none;">
+                    <button onclick="parseFile()" class="btn btn-success btn-large" id="parseButton">
+                        <span class="btn-icon">📡</span>
+                        Start Parsing
+                    </button>
+                    <button onclick="parseFile(true)" class="btn btn-secondary">
+                        <span class="btn-icon">🔄</span>
+                        Force Refresh
+                    </button>
+                </div>
+                <div class="parse-progress" id="parseProgress" style="display: none;">
+                    <div class="loading-spinner"></div>
+                    <p>Parsing in progress...</p>
+                </div>
+            </div>
+
+            <!-- Sub-section 2: Parse History -->
+            <div class="admin-section">
+                <div class="panel-header">
+                    <h2>📡 Parse Status</h2>
+                </div>
+                <div class="admin-info-grid" id="parseHistoryGrid"></div>
+            </div>
+
+            <!-- Sub-section 3: Database Info -->
+            <div class="admin-section">
+                <div class="panel-header">
+                    <h2>🗄️ Database</h2>
+                </div>
+                <div class="admin-info-grid" id="dbInfoGrid"></div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Contract Detail Modal -->
+    <div class="modal-overlay" id="contractModal" onclick="closeContractDetail(event)">
+        <div class="modal-panel modal-panel--wide">
+            <button class="modal-close-btn" onclick="closeContractDetail()">✕</button>
+            <div class="modal-header">
+                <div class="modal-avatar" id="contractModalIcon">📋</div>
+                <div class="modal-title-block">
+                    <h2 class="modal-name" id="contractModalTitle">—</h2>
+                    <div class="modal-badges" id="contractModalBadges"></div>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div class="progress-tiles" id="contractModalTiles" style="margin-bottom:1.25rem;"></div>
+                <div class="progress-chart-wrap" style="margin-bottom:1rem;">
+                    <div class="chart-title" id="contractModalChartTitle">💰 Cumulative Earnings</div>
+                    <div class="chart-container" id="contractModalEarningsChart"></div>
+                </div>
+                <div class="progress-chart-wrap" style="margin-bottom:1rem;">
+                    <div class="chart-title" id="contractModalPerPeriodTitle">💰 Earnings per Period</div>
+                    <div class="chart-container" id="contractModalEarningsPerPeriodChart"></div>
+                </div>
+                <div class="progress-row-2">
+                    <div class="progress-chart-wrap">
+                        <div class="chart-title">📋 Contracts per Period</div>
+                        <div class="chart-container" id="contractModalActivityChart"></div>
+                    </div>
+                    <div class="progress-chart-wrap">
+                        <div class="chart-title">🌍 Top Destinations</div>
+                        <div id="contractModalBodies"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Kerbal Detail Modal -->
+    <div class="modal-overlay" id="kerbalModal" onclick="closeKerbalDetail(event)">
+        <div class="modal-panel">
+            <button class="modal-close-btn" onclick="closeKerbalDetail()">✕</button>
+            <div class="modal-header">
+                <div class="modal-avatar" id="modalAvatar">👨‍🚀</div>
+                <div class="modal-title-block">
+                    <h2 class="modal-name" id="modalName">—</h2>
+                    <div class="modal-badges" id="modalBadges"></div>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div class="modal-assignment" id="modalAssignment"></div>
+                <div class="modal-stats-grid" id="modalStatsGrid"></div>
+                <div class="modal-bars" id="modalBars"></div>
+                <div class="modal-locations" id="modalLocations"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast notifications -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
