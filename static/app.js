@@ -388,6 +388,8 @@ function applyFilters() {
         rating_asc: (a, b) => a.experience - b.experience,
         flights:    (a, b) => b.flights - a.flights,
         name:       (a, b) => a.name.localeCompare(b.name),
+        service:    (a, b) => (a.hired_ut || 0) - (b.hired_ut || 0),  // lower hired_ut = longer service
+        joined:     (a, b) => (a.hired_ut || 0) - (b.hired_ut || 0),  // earliest rescue first; veterans (0) sort first
     };
     filtered.sort(sorts[sortKey] || sorts.rating);
 
