@@ -377,7 +377,7 @@ class DatabaseManager:
         cursor.execute('''
             SELECT *
             FROM kerbals
-            WHERE is_tourist = 0
+            WHERE is_tourist = 0 AND state != 'Available'
             ORDER BY experience DESC, name ASC
         ''')
 
