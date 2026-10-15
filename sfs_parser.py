@@ -47,7 +47,7 @@ class KerbalStats:
     current_vessel: str = ''
 
     hired_ut: float = 0.0  # UT (seconds) when rescued; 0.0 = veteran / unknown
-    body_achievements: Dict[str, str] = field(default_factory=dict)  # body -> best activity
+    body_activities: Dict[str, set] = field(default_factory=dict)  # body -> set of activities
 
     def add_location(self, location: str):
         """Aggiunge una visita a una location"""
@@ -214,11 +214,6 @@ class SFSParser:
             'Flight', 'Suborbit', 'Orbit', 'Flyby', 'Escape',
             'Land', 'Splashdown', 'Crash', 'PlantFlag',
         }
-        # Higher rank = better achievement (used to track best activity per body)
-        ACTIVITY_RANK = {
-            'Flight': 1, 'Suborbit': 2, 'Flyby': 3, 'Escape': 3,
-            'Orbit': 4, 'Crash': 5, 'Splashdown': 6, 'PlantFlag': 6, 'Land': 6,
-        }
         with open(self.filepath, 'r', encoding='utf-8', errors='ignore') as f:
             in_roster = False
             in_kerbal = False
@@ -274,10 +269,9 @@ class SFSParser:
                             event_type = event_type.strip()
                             if location and current_kerbal_name and current_kerbal_name in kerbals:
                                 if in_flight_log or event_type in FLIGHT_EVENTS:
-                                    kerbals[current_kerbal_name].add_location(location)
                                     k = kerbals[current_kerbal_name]
-                                    if ACTIVITY_RANK.get(event_type, 0) > ACTIVITY_RANK.get(k.body_achievements.get(location, ''), 0):
-                                        k.body_achievements[location] = event_type
+                                    k.add_location(location)
+                                    k.body_activities.setdefault(location, set()).add(event_type)
 
                 if stripped.startswith('{'):
                     indent_level += 1
@@ -635,37 +629,36 @@ class SFSParser:
         game_ut = self.parse_rescue_dates(kerbals)
         print(f"Game UT: {game_ut:.0f}s")
 
-        # Compute KSP experience from career achievements.
-        # Each body awards XP for the best activity achieved there.
-        # Values: (orbit/flyby XP, surface XP) — from KSP game data.
-        BODY_XP = {
-            'Sun':    (6.0,  6.0),
-            'Kerbin': (0.5,  0.5),
-            'Mun':    (1.5,  3.0),
-            'Minmus': (2.0,  4.0),
-            'Eve':    (2.5,  7.0),
-            'Gilly':  (1.5,  2.5),
-            'Duna':   (2.5,  8.0),
-            'Ike':    (2.5,  4.0),
-            'Moho':   (3.5,  9.0),
-            'Dres':   (3.5,  7.0),
-            'Jool':   (4.0,  4.0),
-            'Laythe': (4.5,  7.0),
-            'Vall':   (4.5,  5.0),
-            'Tylo':   (5.0, 10.0),
-            'Bop':    (4.5,  5.0),
-            'Pol':    (4.5,  5.0),
-            'Eeloo':  (5.5, 12.0),
+        # Compute KSP experience: each unique (body, activity) pair gives XP independently.
+        # Flyby + Orbit + Land at Mun = 0.5 + 1.5 + 3.0 = 5.0 XP (not just the best).
+        BODY_ACTIVITY_XP = {
+            'Sun':    {'Flyby': 3.0, 'Orbit': 6.0},
+            'Kerbin': {'Flight': 0.5, 'Suborbit': 0.5, 'Orbit': 0.5, 'Flyby': 0.5, 'Land': 0.5, 'Splashdown': 0.5, 'PlantFlag': 0.5, 'Crash': 0.5},
+            'Mun':    {'Flyby': 0.5, 'Orbit': 1.5, 'Land': 3.0, 'PlantFlag': 3.0, 'Crash': 3.0},
+            'Minmus': {'Flyby': 0.5, 'Orbit': 1.5, 'Land': 4.0, 'PlantFlag': 4.0},
+            'Eve':    {'Flight': 0.5, 'Flyby': 1.0, 'Orbit': 2.5, 'Land': 7.0, 'Splashdown': 7.0},
+            'Gilly':  {'Flyby': 0.5, 'Orbit': 1.5, 'Land': 2.5},
+            'Duna':   {'Flight': 0.5, 'Suborbit': 1.0, 'Flyby': 1.0, 'Orbit': 2.5, 'Land': 8.0},
+            'Ike':    {'Flyby': 1.0, 'Orbit': 2.5, 'Land': 4.0},
+            'Moho':   {'Flyby': 1.5, 'Orbit': 3.5, 'Land': 9.0},
+            'Dres':   {'Flyby': 1.5, 'Orbit': 3.5, 'Land': 7.0},
+            'Jool':   {'Flight': 1.0, 'Flyby': 2.0, 'Orbit': 4.0},
+            'Laythe': {'Flight': 1.0, 'Flyby': 2.0, 'Orbit': 4.5, 'Land': 7.0, 'Splashdown': 7.0},
+            'Vall':   {'Flyby': 2.0, 'Orbit': 4.5, 'Land': 5.0},
+            'Tylo':   {'Flyby': 2.5, 'Orbit': 5.0, 'Land': 10.0},
+            'Bop':    {'Flyby': 2.0, 'Orbit': 4.5, 'Land': 5.0, 'PlantFlag': 5.0},
+            'Pol':    {'Flyby': 2.0, 'Orbit': 4.5, 'Land': 5.0},
+            'Eeloo':  {'Flyby': 2.5, 'Orbit': 5.5, 'Land': 12.0},
         }
-        SURFACE_ACTS = {'Land', 'Splashdown', 'Crash', 'PlantFlag'}
-        KSP_LEVELS   = [2, 6, 16, 32, 64]
+        KSP_LEVELS = [2, 6, 16, 32, 64]
 
         for kerbal in kerbals.values():
-            if kerbal.experience == 0.0 and kerbal.body_achievements:
-                xp = 0.0
-                for body, act in kerbal.body_achievements.items():
-                    orbit_xp, surf_xp = BODY_XP.get(body, (1.5, 3.0))
-                    xp += surf_xp if act in SURFACE_ACTS else orbit_xp
+            if kerbal.experience == 0.0 and kerbal.body_activities:
+                xp = sum(
+                    BODY_ACTIVITY_XP.get(body, {}).get(act, 0.0)
+                    for body, acts in kerbal.body_activities.items()
+                    for act in acts
+                )
                 kerbal.experience = round(xp, 2)
             kerbal.experience_level = sum(1 for t in KSP_LEVELS if kerbal.experience >= t)
 
