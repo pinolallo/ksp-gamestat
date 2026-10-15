@@ -18,6 +18,11 @@ function kspDurStr(seconds) {
     return years > 0 ? `${years}Y ${days}D` : `${days}D`;
 }
 
+function starRating(level) {
+    const n = Math.max(0, Math.min(5, level || 0));
+    return '★'.repeat(n) + '☆'.repeat(5 - n);
+}
+
 // State
 let currentConfig = null;
 let kerbalsData = [];
@@ -312,7 +317,7 @@ function renderKerbals(kerbals) {
                     <h3>${escapeHtml(k.name)}</h3>
                     <div class="kerbal-badges">
                         <span class="trait-badge ${trait.cls}">${trait.label}</span>
-                        <span class="level-badge">${level}</span>
+                        <span class="star-rating">${starRating(k.experience_level)}</span>
                     </div>
                 </div>
             </div>
@@ -550,7 +555,7 @@ function populateModal(k) {
 
     const badges = [
         `<span class="trait-badge ${trait.cls}">${trait.label}</span>`,
-        `<span class="level-badge">${level}</span>`,
+        `<span class="star-rating">${starRating(k.experience_level)}</span>`,
         `<span class="state-badge ${stateCls}">${stateLabel}</span>`,
     ];
     if (k.veteran)   badges.push('<span class="honor-badge badge-veteran">Veteran</span>');
@@ -582,7 +587,7 @@ function populateModal(k) {
         </div>
         <div class="modal-stat">
             <div class="modal-stat-label">Level</div>
-            <div class="modal-stat-value">${k.experience_level} / 5</div>
+            <div class="modal-stat-value modal-stat-stars">${starRating(k.experience_level)}</div>
         </div>
         ${k.veteran ? `
         <div class="modal-stat">

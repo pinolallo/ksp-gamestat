@@ -1002,6 +1002,20 @@ body {
     border: 1px solid rgba(0, 217, 255, 0.4);
 }
 
+.star-rating {
+    display: inline-block;
+    font-size: 0.85rem;
+    letter-spacing: 1px;
+    color: var(--accent-orange);
+    line-height: 1;
+}
+
+.modal-stat-stars {
+    font-size: 1.1rem;
+    letter-spacing: 2px;
+    color: var(--accent-orange);
+}
+
 /* ── Card Stats Row (RATING / FLIGHTS / LOCATIONS) ─────────── */
 .kerbal-stats-row {
     display: grid;
