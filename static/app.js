@@ -437,7 +437,7 @@ async function loadSystemInfo() {
                 <div class="admin-info-value admin-info-mono">${meta.last_parsed ? formatDate(meta.last_parsed) : '—'}</div>
             </div>
             <div class="admin-info-card">
-                <div class="admin-info-label">Parse Totali</div>
+                <div class="admin-info-label">Total Parses</div>
                 <div class="admin-info-value">${meta.parse_count}</div>
             </div>
             <div class="admin-info-card">

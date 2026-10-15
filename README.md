@@ -20,6 +20,26 @@ A desktop application for analysing and visualising Kerbal Space Program save-fi
 
 ---
 
+## Screenshots
+
+**Kerbal Roster** — browse and search your crew with rating, location, and vessel info at a glance
+
+![Kerbal Roster](screenshots/kerbals.png)
+
+**Contract Statistics** — mission summary tiles, cumulative earnings curve, and per-period activity bars
+
+![Contract Statistics](screenshots/contracts.png)
+
+**Contract Drill-down** — click any contract type to open a detailed modal with its own charts and top destinations
+
+![Contract Drill-down](screenshots/contract-detail.png)
+
+**Kerbal Detail** — full profile: courage/stupidity bars, experience level, and every body visited
+
+![Kerbal Detail](screenshots/kerbal-detail.png)
+
+---
+
 ## Download
 
 Pre-built installers are available on the [Releases](https://github.com/pinolallo/ksp-gamestat/releases) page:
