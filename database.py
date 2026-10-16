@@ -165,6 +165,14 @@ class DatabaseManager:
                 UNIQUE(tourist_id, location)
             )
         ''')
+        for col, typedef in [
+            ('contract_agent', 'TEXT DEFAULT ""'),
+            ('contract_guid',  'TEXT DEFAULT ""'),
+        ]:
+            try:
+                cursor.execute(f'ALTER TABLE tourists ADD COLUMN {col} {typedef}')
+            except Exception:
+                pass
 
         # Indici per performance
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_kerbal_name ON kerbals(name)')

@@ -470,7 +470,11 @@ function applyTouristFilters() {
 function renderTourists(tourists) {
     const grid = document.getElementById('touristsGrid');
     if (!tourists.length) {
-        grid.innerHTML = '<p class="text-center" style="color:var(--text-secondary);padding:2rem;">No tourists found.</p>';
+        const filter = document.getElementById('touristStateFilter').value;
+        const hint = filter !== 'all'
+            ? `No ${filter.toLowerCase()} tourists. Try <a href="#" onclick="document.getElementById('touristStateFilter').value='all';applyTouristFilters();return false;" style="color:var(--accent-cyan)">All tourists</a>.`
+            : 'No tourists found. Try Force Refresh in Admin.';
+        grid.innerHTML = `<p class="text-center" style="color:var(--text-secondary);padding:2rem;grid-column:1/-1;">${hint}</p>`;
         return;
     }
 
