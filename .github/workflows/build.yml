@@ -59,10 +59,14 @@ jobs:
 
       - name: Build Electron app (Mac arm64)
         if: matrix.platform == 'mac' && matrix.arch == 'arm64'
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
         run: npx electron-builder --mac --arm64 --publish never
 
       - name: Build Electron app (Mac x64)
         if: matrix.platform == 'mac' && matrix.arch == 'x64'
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
         run: npx electron-builder --mac --x64 --publish never
 
       - name: Build Electron app (Windows)

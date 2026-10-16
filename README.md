@@ -63,11 +63,17 @@ Pre-built installers are available on the [Releases](https://github.com/pinolall
 
 ### macOS note (unsigned build)
 
-The app is not notarized. After dragging to Applications, run once in Terminal:
+The app is not signed with an Apple Developer ID. macOS Gatekeeper will block the first launch with a warning ("cannot be opened" or "contains malware"). This is a false positive — the binary is safe.
+
+**Option A — Terminal (recommended):** run once after dragging to Applications:
 
 ```bash
 xattr -rd com.apple.quarantine "/Applications/KSP GameStats.app"
 ```
+
+Then double-click as normal.
+
+**Option B — System Settings:** after a blocked launch, open **System Settings → Privacy & Security**, scroll down to the Security section, and click **Open Anyway** next to the KSP GameStats entry.
 
 ### Linux note
 
