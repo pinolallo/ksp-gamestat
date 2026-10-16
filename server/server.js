@@ -80,10 +80,12 @@ app.get('/api/scan-saves', (_req, res) => {
 
 // ── Config ────────────────────────────────────────────────────────────────────
 app.get('/api/config', (_req, res) => {
+    const sfs_path = db.getConfig('sfs_path', '');
     res.json({
-        sfs_path:   db.getConfig('sfs_path', ''),
+        sfs_path,
         last_hash:  db.getConfig('last_hash', ''),
         last_parse: db.getConfig('last_parse', ''),
+        configured: !!(sfs_path && fs.existsSync(sfs_path)),
     });
 });
 
@@ -286,27 +288,42 @@ app.get('/api/contracts/progress', (req, res) => {
         const total_passengers = history.reduce((s, h) => s + (h.passengers || 0), 0);
 
         const by_prestige = { trivial:{count:0,funds:0}, significant:{count:0,funds:0}, exceptional:{count:0,funds:0} };
-        const byYear      = {};
         const bodyMap     = {};
 
         for (const h of history) {
             const pk = PRESTIGE_KEY[h.prestige] || 'trivial';
             by_prestige[pk].count++;
             by_prestige[pk].funds += h.funds || 0;
-
-            const y = h.kspYear || 1;
-            if (!byYear[y]) byYear[y] = { count: 0, funds: 0, passengers: 0 };
-            byYear[y].count++;
-            byYear[y].funds      += h.funds      || 0;
-            byYear[y].passengers += h.passengers || 0;
-
             if (h.bodyName) bodyMap[h.bodyName] = (bodyMap[h.bodyName] || 0) + 1;
         }
 
+        // Adaptive day-based bins (target ~12-20 bins)
+        const KSP_YEAR = 9203544, KSP_DAY = 21600;
+        const allUts   = history.map(h => h.dateUt).filter(Boolean);
+        const minUt    = allUts.length ? Math.min(...allUts) : 0;
+        const maxUt    = allUts.length ? Math.max(...allUts) : 0;
+        const spanDays = allUts.length ? Math.max(1, (maxUt - minUt) / KSP_DAY) : 1;
+        const binDays  = spanDays <= 100 ? 10 : spanDays <= 400 ? 25 : spanDays <= 1200 ? 50 : 100;
+
+        const byBin = {};
+        for (const h of history) {
+            if (!h.dateUt) continue;
+            const dayNum  = Math.floor(h.dateUt / KSP_DAY);
+            const binDay  = Math.floor(dayNum / binDays) * binDays;
+            const kspYear = Math.floor(binDay * KSP_DAY / KSP_YEAR) + 1;
+            const dayOfYr = binDay - Math.floor((kspYear - 1) * KSP_YEAR / KSP_DAY);
+            const key     = binDay;
+            const label   = `Y${kspYear}-D${dayOfYr + 1}`;
+            if (!byBin[key]) byBin[key] = { label, count: 0, funds: 0, passengers: 0 };
+            byBin[key].count++;
+            byBin[key].funds      += h.funds      || 0;
+            byBin[key].passengers += h.passengers || 0;
+        }
+
         let cumFunds = 0;
-        const by_period = Object.keys(byYear).sort((a, b) => a - b).map(y => {
-            cumFunds += byYear[y].funds;
-            return { label: `Y${y}`, count: byYear[y].count, funds: byYear[y].funds, cumulative_funds: cumFunds, passengers: byYear[y].passengers };
+        const by_period = Object.keys(byBin).sort((a, b) => a - b).map(k => {
+            cumFunds += byBin[k].funds;
+            return { label: byBin[k].label, count: byBin[k].count, funds: byBin[k].funds, cumulative_funds: cumFunds, passengers: byBin[k].passengers };
         });
 
         const by_body = Object.entries(bodyMap).map(([body, count]) => ({ body, count })).sort((a, b) => b.count - a.count);
