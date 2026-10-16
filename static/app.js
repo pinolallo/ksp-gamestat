@@ -27,6 +27,7 @@ function starRating(level) {
 let currentConfig = null;
 let kerbalsData = [];
 let contractsData = [];
+let touristsData = [];
 let gameUt = 0;
 
 // Kerbal roster lookup tables
@@ -124,6 +125,7 @@ async function loadConfig() {
             // Load existing data
             await loadSummary();
             await loadKerbals();
+            await loadTourists();
             await loadContracts();
         } else {
             // Not configured: show tab nav and route to Admin
@@ -226,6 +228,7 @@ async function parseFile(force = false) {
             // Reload data
             await loadSummary();
             await loadKerbals();
+            await loadTourists();
             await loadContracts();
 
             // Redirect to Kerbals tab after successful parse from Admin
@@ -424,6 +427,106 @@ function applyFilters() {
     renderKerbals(filtered);
 }
 
+// ── Tourist roster ──────────────────────────────────────────────────────────
+
+async function loadTourists() {
+    try {
+        const response = await fetch(`${API_BASE}/tourists`);
+        const data = await response.json();
+        if (response.ok && data.tourists) {
+            touristsData = data.tourists;
+            document.getElementById('touristTotal').textContent  = data.count;
+            document.getElementById('touristFlying').textContent = data.flying;
+            applyTouristFilters();
+        }
+    } catch (error) {
+        console.error('Error loading tourists:', error);
+    }
+}
+
+function applyTouristFilters() {
+    const search      = document.getElementById('touristSearch').value.toLowerCase();
+    const sortKey     = document.getElementById('touristSortSelect').value;
+    const stateFilter = document.getElementById('touristStateFilter').value;
+
+    let filtered = touristsData.filter(t => {
+        const matchName  = !search || t.name.toLowerCase().includes(search);
+        const matchState = stateFilter === 'all' || t.state === stateFilter;
+        return matchName && matchState;
+    });
+
+    const sorts = {
+        date_desc: (a, b) => (b.contract_ut || 0) - (a.contract_ut || 0),
+        date_asc:  (a, b) => (a.contract_ut || 0) - (b.contract_ut || 0),
+        name:      (a, b) => a.name.localeCompare(b.name),
+        status:    (a, b) => (a.state === 'Flying' ? 0 : 1) - (b.state === 'Flying' ? 0 : 1),
+    };
+    filtered.sort(sorts[sortKey] || sorts.date_desc);
+
+    renderTourists(filtered);
+}
+
+function renderTourists(tourists) {
+    const grid = document.getElementById('touristsGrid');
+    if (!tourists.length) {
+        grid.innerHTML = '<p class="text-center" style="color:var(--text-secondary);padding:2rem;">No tourists found.</p>';
+        return;
+    }
+
+    grid.innerHTML = tourists.map((t, i) => {
+        const isFlying  = t.state === 'Flying';
+        const avatar    = t.gender === 'Female' ? '👩' : '👨';
+        const stateCls  = isFlying ? 'tourist-flying' : 'tourist-returned';
+        const stateIcon = isFlying ? '✈️ FLYING' : '✅ RETURNED';
+        const bodyBadge = t.contract_body
+            ? `<span class="tourist-body-badge">${escapeHtml(t.contract_body)}</span>` : '';
+        const dateStr   = t.contract_ut > 0 ? kspDateStr(t.contract_ut) : '';
+
+        if (isFlying) {
+            const top3 = t.locations.slice(0, 3);
+            return `<div class="tourist-card tourist-card--flying" style="animation-delay:${i * 0.04}s">
+                <div class="tourist-header">
+                    <div class="tourist-avatar">${avatar}</div>
+                    <div class="tourist-info">
+                        <h3>${escapeHtml(t.name)}</h3>
+                        <div class="tourist-badges">
+                            <span class="tourist-state-badge ${stateCls}">${stateIcon}</span>
+                            ${bodyBadge}
+                        </div>
+                    </div>
+                </div>
+                <div class="tourist-stats-row">
+                    <div class="tourist-stat"><div class="tourist-stat-label">MISSIONS</div><div class="tourist-stat-value">${t.flights}</div></div>
+                    <div class="tourist-stat"><div class="tourist-stat-label">LOCATIONS</div><div class="tourist-stat-value">${t.locations.length}</div></div>
+                    <div class="tourist-stat"><div class="tourist-stat-label">BRAVE</div><div class="tourist-stat-value">${(t.courage * 100).toFixed(0)}%</div></div>
+                </div>
+                ${t.current_location ? `
+                <div class="kerbal-current-location">
+                    <span>📍</span>
+                    <span class="current-loc-text">${escapeHtml(t.current_location)}</span>
+                    ${t.current_vessel ? `<span class="current-vessel-sep">•</span><span class="current-vessel-name">🚀 ${escapeHtml(t.current_vessel)}</span>` : ''}
+                </div>` : ''}
+                ${top3.length ? `<div class="tourist-locs">${top3.map(l =>
+                    `<span class="tourist-loc-tag">${escapeHtml(l.location)}</span>`).join('')}</div>` : ''}
+            </div>`;
+        } else {
+            return `<div class="tourist-card tourist-card--returned" style="animation-delay:${i * 0.02}s">
+                <div class="tourist-header">
+                    <div class="tourist-avatar tourist-avatar--small">${avatar}</div>
+                    <div class="tourist-info">
+                        <h3>${escapeHtml(t.name)}</h3>
+                        <div class="tourist-badges">
+                            <span class="tourist-state-badge ${stateCls}">${stateIcon}</span>
+                            ${bodyBadge}
+                            ${dateStr ? `<span class="tourist-date">📅 ${dateStr}</span>` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        }
+    }).join('');
+}
+
 // Load contracts
 async function loadContracts() {
     try {
@@ -477,7 +580,7 @@ function showTab(tabName, triggerEl) {
 
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
 
-    const panels = { kerbals: 'kerbalsTab', contracts: 'contractsTab', admin: 'adminTab' };
+    const panels = { kerbals: 'kerbalsTab', tourists: 'touristsTab', contracts: 'contractsTab', admin: 'adminTab' };
     const target = document.getElementById(panels[tabName]);
     if (target) target.classList.add('active');
 

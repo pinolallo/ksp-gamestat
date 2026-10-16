@@ -111,10 +111,11 @@ def parse_file():
             })
         
         print(f"Parsing file: {SFS_FILE_PATH}")
-        kerbals, contracts, contract_history, file_hash, game_ut = parser.parse_all()
+        kerbals, tourists, contracts, contract_history, file_hash, game_ut = parser.parse_all()
 
         print("Saving to database...")
         db.save_kerbals(kerbals)
+        db.save_tourists(tourists)
         db.save_contracts(contracts)
         db.save_contract_history(contract_history)
         db.update_file_metadata(SFS_FILE_PATH, file_hash)
@@ -122,6 +123,7 @@ def parse_file():
 
         stats = {
             'kerbals_parsed': len(kerbals),
+            'tourists_parsed': len(tourists),
             'contracts_parsed': len(contracts),
             'file_hash': file_hash
         }
@@ -168,6 +170,17 @@ def get_kerbal(name):
             'success': True,
             'kerbal': kerbal
         })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tourists', methods=['GET'])
+def get_tourists():
+    """Return all tourists (flying and historical)"""
+    try:
+        tourists = db.get_all_tourists()
+        flying = sum(1 for t in tourists if t['state'] == 'Flying')
+        return jsonify({'success': True, 'tourists': tourists, 'count': len(tourists), 'flying': flying})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

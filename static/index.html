@@ -93,6 +93,9 @@
             <button class="tab-btn active" data-tab="kerbals" onclick="showTab('kerbals', this)">
                 👨‍🚀 Kerbals
             </button>
+            <button class="tab-btn" data-tab="tourists" onclick="showTab('tourists', this)">
+                🧳 Tourists
+            </button>
             <button class="tab-btn" data-tab="contracts" onclick="showTab('contracts', this)">
                 📋 Contracts
             </button>
@@ -142,6 +145,47 @@
             <div class="kerbals-grid" id="kerbalsGrid">
                 <!-- Kerbals cards will be populated here -->
             </div>
+        </section>
+
+        <!-- Tourists Tab -->
+        <section class="tab-content" id="touristsTab">
+            <div class="panel-header">
+                <div class="roster-title-row">
+                    <h2>🧳 Tourist Roster</h2>
+                    <div class="roster-counter">
+                        <span id="touristFlying">0</span>
+                        <span class="counter-label">FLYING</span>
+                        /
+                        <span id="touristTotal">0</span>
+                        <span class="counter-label">TOTAL</span>
+                    </div>
+                </div>
+                <div class="roster-controls">
+                    <div class="control-group">
+                        <label class="control-label">🔍 SEARCH</label>
+                        <input type="text" id="touristSearch" placeholder="Type name..."
+                               class="input-field" oninput="applyTouristFilters()">
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label">⚡ SORT BY</label>
+                        <select id="touristSortSelect" class="filter-select" onchange="applyTouristFilters()">
+                            <option value="date_desc">📅 Date (Latest First)</option>
+                            <option value="date_asc">📅 Date (Earliest First)</option>
+                            <option value="name">🔤 Name A→Z</option>
+                            <option value="status">✈️ Flying First</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label">🌍 FILTER</label>
+                        <select id="touristStateFilter" class="filter-select" onchange="applyTouristFilters()">
+                            <option value="all">All</option>
+                            <option value="Flying">✈️ Flying only</option>
+                            <option value="Returned">✅ Returned only</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="tourists-grid" id="touristsGrid"></div>
         </section>
 
         <!-- Contracts Tab -->

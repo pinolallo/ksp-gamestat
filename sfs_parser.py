@@ -52,6 +52,24 @@ class KerbalStats:
 
 
 @dataclass
+class TouristRecord:
+    """Statistiche per un singolo turista (attivo o storico)"""
+    name: str
+    state: str = 'Returned'      # 'Flying' = ancora in roster; 'Returned' = da contratto storico
+    flights: int = 0
+    courage: float = 0.0
+    stupidity: float = 0.0
+    gender: str = 'Male'
+    current_location: str = ''
+    current_vessel: str = ''
+    contract_ut: float = 0.0     # UT completamento contratto (0 = non noto)
+    contract_body: str = ''      # corpo di destinazione dal contratto
+    locations: Dict[str, int] = field(default_factory=dict)
+    body_missions: Dict[str, set] = field(default_factory=dict)
+    body_activities: Dict[str, set] = field(default_factory=dict)
+
+
+@dataclass
 class ContractRecord:
     """Single completed contract with timestamp, for progression charting"""
     contract_type: str
@@ -275,8 +293,146 @@ class SFSParser:
 
         return kerbals
     
-    def parse_vessel_assignments(self, kerbals: Dict[str, KerbalStats]) -> None:
-        """Determines current location and vessel for each assigned Kerbal"""
+    def parse_tourist_roster(self) -> Dict[str, 'TouristRecord']:
+        """Parse ROSTER section for type=Tourist kerbals (currently flying)."""
+        tourists: Dict[str, TouristRecord] = {}
+        with open(self.filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            in_roster = False
+            in_kerbal = False
+            current_name = None
+            current_type = None
+            current_trait = ''
+            current_courage = 0.0
+            current_stupidity = 0.0
+            current_gender = 'Male'
+            indent_level = 0
+
+            for line in f:
+                stripped = line.strip()
+                if stripped.startswith('}'):
+                    indent_level -= 1
+                    if in_kerbal and indent_level == 1:
+                        is_tourist = (current_type == 'Tourist' or current_trait == 'Tourist')
+                        if current_name and is_tourist:
+                            tourists[current_name] = TouristRecord(
+                                name=current_name,
+                                state='Flying',
+                                courage=current_courage,
+                                stupidity=current_stupidity,
+                                gender=current_gender,
+                            )
+                        current_name = None
+                        current_type = None
+                        in_kerbal = False
+                    elif in_roster and indent_level == 0:
+                        in_roster = False
+
+                if stripped == 'ROSTER':
+                    in_roster = True
+                    indent_level = 0
+                elif in_roster and stripped == 'KERBAL':
+                    in_kerbal = True
+                    indent_level = 1
+                    current_name = None
+                    current_type = None
+                    current_trait = ''
+                    current_courage = 0.0
+                    current_stupidity = 0.0
+                    current_gender = 'Male'
+                elif in_kerbal and indent_level == 2:
+                    if stripped.startswith('name ='):
+                        current_name = stripped.split('=', 1)[1].strip()
+                    elif stripped.startswith('type ='):
+                        current_type = stripped.split('=', 1)[1].strip()
+                    elif stripped.startswith('trait ='):
+                        current_trait = stripped.split('=', 1)[1].strip()
+                    elif stripped.startswith('brave ='):
+                        try:
+                            current_courage = float(stripped.split('=', 1)[1].strip())
+                        except ValueError:
+                            pass
+                    elif stripped.startswith('dumb ='):
+                        try:
+                            current_stupidity = float(stripped.split('=', 1)[1].strip())
+                        except ValueError:
+                            pass
+                    elif stripped.startswith('gender ='):
+                        current_gender = stripped.split('=', 1)[1].strip()
+
+                if stripped.startswith('{'):
+                    indent_level += 1
+        return tourists
+
+    def parse_tourist_contracts(self) -> Dict[str, 'TouristRecord']:
+        """Extract historical tourists from completed TourismContract records.
+        Uses the 'tourists = name1|name2|...' field present in each record.
+        Overwrites earlier entries so the most recent contract per tourist wins.
+        """
+        tourists: Dict[str, TouristRecord] = {}
+        with open(self.filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            in_contracts = False
+            in_contract = False
+            current_type = None
+            current_body = ''
+            current_ut = 0.0
+            current_names: list = []
+            indent_level = 0
+
+            for line in f:
+                stripped = line.strip()
+                if stripped.startswith('}'):
+                    indent_level -= 1
+                    if in_contract and indent_level == 1:
+                        if current_type == 'TourismContract' and current_names and current_ut > 0:
+                            for name in current_names:
+                                if name:
+                                    tourists[name] = TouristRecord(
+                                        name=name,
+                                        state='Returned',
+                                        contract_ut=current_ut,
+                                        contract_body=current_body,
+                                    )
+                        current_type = None
+                        current_body = ''
+                        current_ut = 0.0
+                        current_names = []
+                        in_contract = False
+                    elif in_contracts and indent_level == 0:
+                        in_contracts = False
+
+                if stripped == 'CONTRACTS':
+                    in_contracts = True
+                    indent_level = 0
+                elif in_contracts and stripped == 'CONTRACT_FINISHED':
+                    in_contract = True
+                    indent_level = 1
+                elif in_contract and indent_level == 2:
+                    if stripped.startswith('type ='):
+                        current_type = stripped.split('=', 1)[1].strip()
+                    elif stripped.startswith('bodyName ='):
+                        current_body = stripped.split('=', 1)[1].strip()
+                    elif stripped.startswith('targetBody =') and not current_body:
+                        try:
+                            ref = int(stripped.split('=', 1)[1].strip())
+                            current_body = BODY_NAMES.get(ref, '')
+                        except ValueError:
+                            pass
+                    elif stripped.startswith('tourists ='):
+                        names_str = stripped.split('=', 1)[1].strip()
+                        current_names = [n.strip() for n in names_str.split('|') if n.strip()]
+                    elif stripped.startswith('values ='):
+                        try:
+                            vals = [float(v) for v in stripped.split('=', 1)[1].strip().split(',')]
+                            current_ut = vals[8] if len(vals) > 8 else 0.0
+                        except (ValueError, IndexError):
+                            pass
+
+                if stripped.startswith('{'):
+                    indent_level += 1
+        return tourists
+
+    def parse_vessel_assignments(self, crew: dict) -> None:
+        """Determines current location and vessel for each assigned crew member (kerbals or tourists)."""
         location_map: Dict[str, str] = {}
         vessel_map: Dict[str, str] = {}
 
@@ -355,17 +511,17 @@ class SFSParser:
 
                     if abs_indent > vessel_base_depth and stripped.startswith('crew ='):
                         candidate = stripped.split('=', 1)[1].strip()
-                        if candidate in kerbals:
+                        if candidate in crew:
                             crew_names.add(candidate)
 
                 if stripped.startswith('{'):
                     abs_indent += 1
 
-        for kerbal_name, kerbal in kerbals.items():
-            if kerbal.state == 'Available':
+        for kerbal_name, kerbal in crew.items():
+            if getattr(kerbal, 'state', '') == 'Available':
                 kerbal.current_location = 'Kerbin (KSC)'
                 kerbal.current_vessel = ''
-            elif kerbal.state == 'Assigned':
+            elif getattr(kerbal, 'state', '') == 'Assigned':
                 kerbal.current_location = location_map.get(kerbal_name, 'Unknown')
                 kerbal.current_vessel = vessel_map.get(kerbal_name, '')
             elif kerbal.state == 'Dead':
@@ -602,10 +758,10 @@ class SFSParser:
 
         return current_ut
 
-    def parse_all(self) -> Tuple[Dict[str, KerbalStats], Dict[str, ContractStats], List['ContractRecord'], str, float]:
+    def parse_all(self):
         """
         Full parse of the save file.
-        Returns: (kerbals_dict, contracts_dict, contract_history, file_hash, game_ut)
+        Returns: (kerbals_dict, tourists_dict, contracts_dict, contract_history, file_hash, game_ut)
         """
         file_hash = self.calculate_file_hash()
 
@@ -621,9 +777,23 @@ class SFSParser:
         for kerbal in kerbals.values():
             kerbal.locations = {body: len(missions) for body, missions in kerbal.body_missions.items()}
 
-        # Parse vessel assignments (current location + ship)
+        # Parse tourists — active (ROSTER) + historical (TourismContract records)
+        print("Parsing tourist roster...")
+        active_tourists = self.parse_tourist_roster()
+        self.parse_flight_logs(active_tourists)  # reuse: duck-typed, same fields
+        for t in active_tourists.values():
+            t.locations = {body: len(missions) for body, missions in t.body_missions.items()}
+
+        print("Parsing tourist contract history...")
+        historical_tourists = self.parse_tourist_contracts()
+        print(f"Active tourists: {len(active_tourists)}, historical: {len(historical_tourists)}")
+
+        # Merge: active (Flying) takes priority over historical for same name
+        all_tourists = {**historical_tourists, **active_tourists}
+
+        # Vessel assignments for both kerbals and active tourists
         print("Parsing vessel assignments...")
-        self.parse_vessel_assignments(kerbals)
+        self.parse_vessel_assignments({**kerbals, **active_tourists})
 
         # Parse rescue dates and current game time
         print("Parsing rescue dates...")
@@ -672,11 +842,11 @@ class SFSParser:
         contract_history = self.parse_contract_history()
         print(f"Contract history: {len(contract_history)} records")
 
-        # Remove tourists
+        # Remove tourists from kerbals dict
         kerbals = {name: stats for name, stats in kerbals.items()
                    if not stats.is_tourist}
 
-        return kerbals, contracts, contract_history, file_hash, game_ut
+        return kerbals, all_tourists, contracts, contract_history, file_hash, game_ut
 
 
 if __name__ == '__main__':

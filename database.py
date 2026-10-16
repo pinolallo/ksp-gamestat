@@ -8,7 +8,7 @@ import json
 import threading
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
-from sfs_parser import KerbalStats, ContractStats, ContractRecord
+from sfs_parser import KerbalStats, ContractStats, ContractRecord, TouristRecord
 
 
 class DatabaseManager:
@@ -135,6 +135,34 @@ class DatabaseManager:
             cursor.execute('ALTER TABLE file_metadata ADD COLUMN game_ut REAL DEFAULT 0')
         except Exception:
             pass
+
+        # Tourists table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS tourists (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                state TEXT DEFAULT 'Returned',
+                flights INTEGER DEFAULT 0,
+                courage REAL DEFAULT 0.0,
+                stupidity REAL DEFAULT 0.0,
+                gender TEXT DEFAULT 'Male',
+                current_location TEXT DEFAULT '',
+                current_vessel TEXT DEFAULT '',
+                contract_ut REAL DEFAULT 0.0,
+                contract_body TEXT DEFAULT '',
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS tourist_locations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tourist_id INTEGER NOT NULL,
+                location TEXT NOT NULL,
+                visit_count INTEGER DEFAULT 0,
+                FOREIGN KEY (tourist_id) REFERENCES tourists(id),
+                UNIQUE(tourist_id, location)
+            )
+        ''')
 
         # Indici per performance
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_kerbal_name ON kerbals(name)')
@@ -486,6 +514,65 @@ class DatabaseManager:
         
         return contracts
     
+    def save_tourists(self, tourists: Dict[str, TouristRecord]):
+        """Full replace of tourists on every parse."""
+        cursor = self.conn.cursor()
+        cursor.execute('DELETE FROM tourist_locations')
+        cursor.execute('DELETE FROM tourists')
+
+        for name, t in tourists.items():
+            cursor.execute('''
+                INSERT INTO tourists
+                    (name, state, flights, courage, stupidity, gender,
+                     current_location, current_vessel, contract_ut, contract_body, last_updated)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ''', (name, t.state, t.flights, t.courage, t.stupidity, t.gender,
+                  t.current_location, t.current_vessel, t.contract_ut, t.contract_body))
+
+            tourist_id = cursor.lastrowid
+            for location, count in t.locations.items():
+                cursor.execute('''
+                    INSERT INTO tourist_locations (tourist_id, location, visit_count)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(tourist_id, location) DO UPDATE SET visit_count = excluded.visit_count
+                ''', (tourist_id, location, count))
+
+        self.conn.commit()
+
+    def get_all_tourists(self) -> List[Dict]:
+        """Return all tourists — Flying first, then Returned sorted by contract date desc."""
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT * FROM tourists
+            ORDER BY
+                CASE state WHEN 'Flying' THEN 0 ELSE 1 END,
+                contract_ut DESC,
+                name ASC
+        ''')
+        result = []
+        for row in cursor.fetchall():
+            t = {
+                'id':               row['id'],
+                'name':             row['name'],
+                'state':            row['state'],
+                'flights':          row['flights'],
+                'courage':          row['courage'] or 0.0,
+                'stupidity':        row['stupidity'] or 0.0,
+                'gender':           row['gender'] or 'Male',
+                'current_location': row['current_location'] or '',
+                'current_vessel':   row['current_vessel'] or '',
+                'contract_ut':      row['contract_ut'] or 0.0,
+                'contract_body':    row['contract_body'] or '',
+                'locations':        [],
+            }
+            cursor.execute(
+                'SELECT location, visit_count FROM tourist_locations WHERE tourist_id = ? ORDER BY visit_count DESC',
+                (t['id'],)
+            )
+            t['locations'] = [{'location': r[0], 'count': r[1]} for r in cursor.fetchall()]
+            result.append(t)
+        return result
+
     def save_game_ut(self, game_ut: float):
         """Store the current game UT on the most recent file_metadata row."""
         cursor = self.conn.cursor()
