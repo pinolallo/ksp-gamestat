@@ -524,13 +524,13 @@ function renderTourists(tourists) {
     }).join('');
 
     // ── Returned tourists: grouped by contract_guid ──
-    const groups = new Map(); // guid → { agent, body, ut, names[] }
+    const groups = new Map(); // guid → { agent, body, ut, tourists[] }
     for (const t of returned) {
         const key = t.contract_guid || `_${t.contract_ut}_${t.contract_body}`;
         if (!groups.has(key)) {
-            groups.set(key, { agent: t.contract_agent, body: t.contract_body, ut: t.contract_ut, names: [] });
+            groups.set(key, { agent: t.contract_agent, body: t.contract_body, ut: t.contract_ut, tourists: [] });
         }
-        groups.get(key).names.push(t.name);
+        groups.get(key).tourists.push({ name: t.name, gender: t.gender });
     }
 
     const groupsSorted = [...groups.values()].sort((a, b) => (b.ut || 0) - (a.ut || 0));
@@ -544,10 +544,10 @@ function renderTourists(tourists) {
                     ${g.body ? `<span class="tourist-body-badge">${escapeHtml(g.body)}</span>` : ''}
                     ${g.ut > 0 ? `<span class="tcg-date">📅 ${kspDateStr(g.ut)}</span>` : ''}
                     ${g.agent ? `<span class="tcg-agent">🏢 ${escapeHtml(g.agent)}</span>` : ''}
-                    <span class="tcg-count">${g.names.length} tourist${g.names.length > 1 ? 's' : ''}</span>
+                    <span class="tcg-count">${g.tourists.length} tourist${g.tourists.length > 1 ? 's' : ''}</span>
                 </div>
-                <div class="tcg-names">${g.names.map(n =>
-                    `<span class="tcg-name">${escapeHtml(n)}</span>`).join('')}
+                <div class="tcg-names">${g.tourists.map(t =>
+                    `<span class="tcg-name">${t.gender === 'Female' ? '👩' : '👨'} ${escapeHtml(t.name)}</span>`).join('')}
                 </div>
             </div>`).join('')}
         </div>` : '';
