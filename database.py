@@ -161,6 +161,7 @@ class DatabaseManager:
                 tourist_id INTEGER NOT NULL,
                 location TEXT NOT NULL,
                 visit_count INTEGER DEFAULT 0,
+                activities TEXT DEFAULT '',
                 FOREIGN KEY (tourist_id) REFERENCES tourists(id),
                 UNIQUE(tourist_id, location)
             )
@@ -168,11 +169,16 @@ class DatabaseManager:
         for col, typedef in [
             ('contract_agent', 'TEXT DEFAULT ""'),
             ('contract_guid',  'TEXT DEFAULT ""'),
+            ('objectives',     'TEXT DEFAULT "[]"'),
         ]:
             try:
                 cursor.execute(f'ALTER TABLE tourists ADD COLUMN {col} {typedef}')
             except Exception:
                 pass
+        try:
+            cursor.execute('ALTER TABLE tourist_locations ADD COLUMN activities TEXT DEFAULT ""')
+        except Exception:
+            pass
 
         # Indici per performance
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_kerbal_name ON kerbals(name)')
@@ -535,19 +541,27 @@ class DatabaseManager:
                 INSERT INTO tourists
                     (name, state, flights, courage, stupidity, gender,
                      current_location, current_vessel, contract_ut, contract_body,
-                     contract_agent, contract_guid, last_updated)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                     contract_agent, contract_guid, objectives, last_updated)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             ''', (name, t.state, t.flights, t.courage, t.stupidity, t.gender,
                   t.current_location, t.current_vessel, t.contract_ut, t.contract_body,
-                  t.contract_agent, t.contract_guid))
+                  t.contract_agent, t.contract_guid,
+                  json.dumps(t.objectives)))
 
             tourist_id = cursor.lastrowid
+            # Ordered activity display: use canonical KSP progression order
+            ACTIVITY_ORDER = ['Flight', 'Suborbit', 'Orbit', 'Flyby', 'Escape',
+                              'Land', 'Splashdown', 'PlantFlag', 'Crash']
             for location, count in t.locations.items():
+                acts = t.body_activities.get(location, set())
+                acts_str = '|'.join(a for a in ACTIVITY_ORDER if a in acts)
                 cursor.execute('''
-                    INSERT INTO tourist_locations (tourist_id, location, visit_count)
-                    VALUES (?, ?, ?)
-                    ON CONFLICT(tourist_id, location) DO UPDATE SET visit_count = excluded.visit_count
-                ''', (tourist_id, location, count))
+                    INSERT INTO tourist_locations (tourist_id, location, visit_count, activities)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(tourist_id, location) DO UPDATE SET
+                        visit_count = excluded.visit_count,
+                        activities  = excluded.activities
+                ''', (tourist_id, location, count, acts_str))
 
         self.conn.commit()
 
@@ -577,13 +591,21 @@ class DatabaseManager:
                 'contract_body':    row['contract_body'] or '',
                 'contract_agent':   row['contract_agent'] or '',
                 'contract_guid':    row['contract_guid'] or '',
+                'objectives':       json.loads(row['objectives'] or '[]'),
                 'locations':        [],
             }
             cursor.execute(
-                'SELECT location, visit_count FROM tourist_locations WHERE tourist_id = ? ORDER BY visit_count DESC',
+                'SELECT location, visit_count, activities FROM tourist_locations WHERE tourist_id = ? ORDER BY visit_count DESC',
                 (t['id'],)
             )
-            t['locations'] = [{'location': r[0], 'count': r[1]} for r in cursor.fetchall()]
+            t['locations'] = [
+                {
+                    'location':   r[0],
+                    'count':      r[1],
+                    'activities': [a for a in (r[2] or '').split('|') if a],
+                }
+                for r in cursor.fetchall()
+            ]
             result.append(t)
         return result
 

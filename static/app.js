@@ -493,7 +493,8 @@ function renderTourists(tourists) {
         const avatar = t.gender === 'Female' ? '👩' : '👨';
         const bodyBadge = t.contract_body
             ? `<span class="tourist-body-badge">${escapeHtml(t.contract_body)}</span>` : '';
-        const top3   = t.locations.slice(0, 3);
+        const contractCompleteBadge = t.state === 'Flying' && !(t.objectives || []).length
+            ? `<span class="tourist-state-badge tourist-contract-done">🏁 CONTRACT DONE</span>` : '';
         const locStr = t.current_location && t.current_location !== 'Kerbin (KSC)'
             ? t.current_location : (t.current_location || '');
         return `<div class="tourist-card tourist-card--flying" style="animation-delay:${i * 0.04}s">
@@ -503,6 +504,7 @@ function renderTourists(tourists) {
                     <h3>${escapeHtml(t.name)}</h3>
                     <div class="tourist-badges">
                         <span class="tourist-state-badge ${si.cls}">${si.label}</span>
+                        ${contractCompleteBadge}
                         ${bodyBadge}
                     </div>
                 </div>
@@ -518,8 +520,29 @@ function renderTourists(tourists) {
                 <span class="current-loc-text">${escapeHtml(locStr)}</span>
                 ${t.current_vessel ? `<span class="current-vessel-sep">•</span><span class="current-vessel-name">🚀 ${escapeHtml(t.current_vessel)}</span>` : ''}
             </div>` : ''}
-            ${top3.length ? `<div class="tourist-locs">${top3.map(l =>
-                `<span class="tourist-loc-tag">${escapeHtml(l.location)}</span>`).join('')}</div>` : ''}
+            ${(() => {
+                const objs = t.objectives || [];
+                if (objs.length) {
+                    // Group contract objectives by body, preserve order
+                    const byBody = [];
+                    const seen = {};
+                    for (const o of objs) {
+                        if (!seen[o.body]) { seen[o.body] = []; byBody.push([o.body, seen[o.body]]); }
+                        seen[o.body].push(o);
+                    }
+                    return `<div class="tourist-trip">${byBody.map(([body, os]) =>
+                        `<div class="tourist-trip-body">
+                            <span class="tourist-loc-tag">${escapeHtml(body)}</span>
+                            ${os.map(o => `<span class="tourist-act-tag ${o.complete ? 'act-done' : 'act-pending'}">${o.complete ? '✓' : '○'} ${o.activity}</span>`).join('')}
+                        </div>`).join('')}</div>`;
+                }
+                // Fallback: show flight-log activities if no contract objectives
+                return t.locations.length ? `<div class="tourist-trip">${t.locations.map(l =>
+                    `<div class="tourist-trip-body">
+                        <span class="tourist-loc-tag">${escapeHtml(l.location)}</span>
+                        ${l.activities && l.activities.length ? l.activities.map(a => `<span class="tourist-act-tag">${a}</span>`).join('') : ''}
+                    </div>`).join('')}</div>` : '';
+            })()}
         </div>`;
     }).join('');
 
@@ -547,7 +570,7 @@ function renderTourists(tourists) {
                     <span class="tcg-count">${g.tourists.length} tourist${g.tourists.length > 1 ? 's' : ''}</span>
                 </div>
                 <div class="tcg-names">${g.tourists.map(t =>
-                    `<span class="tcg-name">${t.gender === 'Female' ? '👩' : '👨'} ${escapeHtml(t.name)}</span>`).join('')}
+                    `<span class="tcg-name">${escapeHtml(t.name)}</span>`).join('')}
                 </div>
             </div>`).join('')}
         </div>` : '';

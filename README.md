@@ -10,10 +10,11 @@ A desktop application for analysing and visualising Kerbal Space Program save-fi
 
 ## Features
 
-- **Kerbal Roster** — star rating (computed from KSP XP), trait badges, missions, locations, join date and service duration per kerbal
-- **Corps Summary** — at-a-glance Pilot / Engineer / Scientist counts split by Assigned vs Available
+- **Kerbal Roster** — star rating (computed from KSP XP), trait badges, missions, locations, join date and service duration per kerbal; corps summary bar (Pilots / Engineers / Scientists, assigned vs available)
+- **Tourist Roster** — live view of flying tourists with contract objectives and completion status per body; returned tourists grouped by contract mission with date and agency
 - **Contracts Dashboard** — visual progression timeline: cumulative earnings, contracts per period, earnings per period, prestige breakdown, and top destinations
 - **Contract Drill-down** — click any contract type to see its own filtered dashboard; TourismContract shows passenger counts instead of funds
+- **Accurate Visit Counts** — mission-level deduplication: multiple events in the same mission (Flyby + Orbit + Land) count as one visit, not three
 - **Incremental Parsing** — MD5-based cache avoids re-parsing an unchanged save file; force-refresh available
 - **SQLite Database** — stored in the OS user-data directory, survives app updates
 - **Space-Themed UI** — Orbitron/IBM Plex Mono fonts, animated starfield, cyan/orange palette
@@ -23,13 +24,21 @@ A desktop application for analysing and visualising Kerbal Space Program save-fi
 
 ## Screenshots
 
-**Kerbal Roster** — corps summary bar (Pilots / Engineers / Scientists assigned vs available) and crew cards with star rating, missions, service duration, and top destinations
+**Kerbal Roster** — summary stats, corps breakdown (Pilots / Engineers / Scientists assigned vs available), and crew cards sorted by star rating
 
 ![Kerbal Roster](screenshots/kerbals.png)
 
 **Kerbal Detail** — full profile with star level, join date, service time, courage/stupidity bars, and every body visited
 
 ![Kerbal Detail](screenshots/kerbal-detail.png)
+
+**Tourist Roster — Flying** — active tourists with contract objectives per celestial body; ✓ green = completed, ○ yellow = pending; 🏁 badge for tourists whose contract is already fulfilled and awaiting recovery
+
+![Tourist Roster — Flying](screenshots/tourists-flying.png)
+
+**Tourist Roster — Returned** — 600+ historical tourists grouped by contract mission, with KSP date and agency
+
+![Tourist Roster — Returned](screenshots/tourists-returned.png)
 
 **Contract Statistics** — mission summary tiles, cumulative earnings curve, and per-period activity bars
 
@@ -77,7 +86,7 @@ chmod +x KSP-GameStats-*.AppImage
    - **macOS**: `~/Library/Application Support/Steam/steamapps/common/Kerbal Space Program/saves/<save-name>/persistent.sfs`
    - **Windows**: `%ProgramFiles(x86)%\Steam\steamapps\common\Kerbal Space Program\saves\<save-name>\persistent.sfs`
 3. Click **Configure**, then **Start Parsing**
-4. Switch to the **Kerbals** or **Contracts** tab to explore your data
+4. Switch to the **Kerbals**, **Tourists**, or **Contracts** tab to explore your data
 
 The database is stored automatically in:
 - macOS: `~/Library/Application Support/ksp-gamestat/ksp_stats.db`
@@ -165,6 +174,7 @@ ksp-gamestat/
 | GET | `/api/summary` | Top-level stats (kerbals, flights, contracts, funds) |
 | GET | `/api/kerbals` | All kerbals (tourists excluded) |
 | GET | `/api/kerbals/<name>` | Single kerbal detail |
+| GET | `/api/tourists` | All tourists with state, objectives, and location history |
 | GET | `/api/contracts` | Contracts aggregated by type |
 | GET | `/api/contracts/progress` | Progression timeline data (optional `?type=` filter) |
 | GET | `/api/health` | Health check |
@@ -179,8 +189,8 @@ GitHub Actions builds the app on every version tag (`v*`). Four runners produce 
 To publish a new release:
 
 ```bash
-git tag v1.1.0
-git push origin v1.1.0
+git tag v1.2.0
+git push origin v1.2.0
 ```
 
 Then review and publish the draft release on GitHub.
@@ -193,7 +203,7 @@ Then review and publish the draft release on GitHub.
 
 **"File not found"** — use the absolute path to `persistent.sfs`; verify the file exists and is readable.
 
-**Database issues** — delete `ksp_stats.db` from the user-data directory and re-parse. The schema is recreated automatically.
+**Database issues** — delete `ksp_stats.db` from the user-data directory and re-parse. The schema is recreated automatically with migrations.
 
 **Backend does not start (dev mode)** — make sure `npm run build:backend` completed successfully and `dist_pyinstaller/ksp-gamestat-server/` exists.
 

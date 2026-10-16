@@ -69,6 +69,8 @@ class TouristRecord:
     locations: Dict[str, int] = field(default_factory=dict)
     body_missions: Dict[str, set] = field(default_factory=dict)
     body_activities: Dict[str, set] = field(default_factory=dict)
+    objectives: List[Dict] = field(default_factory=list)
+    # e.g. [{'body': 'Mun', 'activity': 'Orbit', 'complete': True}, ...]
 
 
 @dataclass
@@ -451,6 +453,90 @@ class SFSParser:
                     indent_level += 1
         return tourists
 
+    def parse_active_tourism_contracts(self) -> Dict[str, List[Dict]]:
+        """
+        Parse objectives from active TourismContract blocks (CONTRACT, not CONTRACT_FINISHED).
+        Returns: {tourist_name: [{'body': str, 'activity': str, 'complete': bool}]}
+        Objectives are ordered per-tourist as they appear in the contract.
+        """
+        result: Dict[str, List[Dict]] = {}
+
+        with open(self.filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            in_contracts     = False
+            in_contract      = False
+            contract_is_tour = False
+            indent_level     = 0
+            current_tourist  = None
+            dest_body_idx    = None
+            dest_type        = ''
+            dest_state       = 'Incomplete'
+
+            for line in f:
+                s = line.strip()
+
+                if s.startswith('}'):
+                    indent_level -= 1
+
+                    if in_contract:
+                        if indent_level == 3:
+                            # Closing a KerbalDestinationParameter block → record objective
+                            if (contract_is_tour and current_tourist
+                                    and dest_type and dest_body_idx is not None):
+                                body_name = BODY_NAMES.get(dest_body_idx, '')
+                                if body_name:
+                                    result.setdefault(current_tourist, []).append({
+                                        'body':     body_name,
+                                        'activity': dest_type,
+                                        'complete': dest_state == 'Complete',
+                                    })
+                            dest_body_idx = None
+                            dest_type     = ''
+                            dest_state    = 'Incomplete'
+
+                        elif indent_level == 2:
+                            # Closing a KerbalTourParameter block
+                            current_tourist = None
+
+                        elif indent_level == 1:
+                            # Closing the CONTRACT block
+                            in_contract      = False
+                            contract_is_tour = False
+
+                    elif in_contracts and indent_level == 0:
+                        in_contracts = False
+                        break
+
+                elif s == 'CONTRACTS':
+                    in_contracts = True
+                    indent_level = 0
+
+                elif in_contracts and not in_contract and s == 'CONTRACT':
+                    in_contract = True   # indent_level is already 1 (inside CONTRACTS body)
+
+                elif in_contract:
+                    if indent_level == 2 and s.startswith('type =') and 'TourismContract' in s:
+                        contract_is_tour = True
+
+                    elif indent_level == 3 and contract_is_tour:
+                        if s.startswith('kerbalName ='):
+                            current_tourist = s.split('=', 1)[1].strip()
+
+                    elif indent_level == 4 and contract_is_tour:
+                        if s.startswith('targetBody ='):
+                            try:
+                                dest_body_idx = int(s.split('=', 1)[1].strip())
+                            except ValueError:
+                                pass
+                        elif s.startswith('targetType ='):
+                            dest_type = s.split('=', 1)[1].strip()
+                        elif s.startswith('state ='):
+                            dest_state = s.split('=', 1)[1].strip()
+
+                if s.startswith('{'):
+                    indent_level += 1
+
+        return result
+
     def parse_vessel_assignments(self, crew: dict) -> None:
         """Determines current location and vessel for each assigned crew member (kerbals or tourists)."""
         location_map: Dict[str, str] = {}
@@ -814,6 +900,13 @@ class SFSParser:
         # Vessel assignments for both kerbals and active tourists
         print("Parsing vessel assignments...")
         self.parse_vessel_assignments({**kerbals, **active_tourists})
+
+        # Parse active contract objectives per tourist
+        print("Parsing active tourism contract objectives...")
+        contract_objectives = self.parse_active_tourism_contracts()
+        for t_name, objectives in contract_objectives.items():
+            if t_name in active_tourists:
+                active_tourists[t_name].objectives = objectives
 
         # Parse rescue dates and current game time
         print("Parsing rescue dates...")
