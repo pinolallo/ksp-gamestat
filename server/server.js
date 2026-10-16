@@ -222,7 +222,7 @@ app.get('/api/kerbals/:name', (req, res) => {
     try {
         const k = db.getKerbal(req.params.name);
         if (!k) return res.status(404).json({ error: 'Kerbal not found' });
-        res.json(fmtKerbal(k));
+        res.json({ kerbal: fmtKerbal(k) });
     } catch (err) { res.status(500).json({ error: String(err) }); }
 });
 
