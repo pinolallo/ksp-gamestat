@@ -10,7 +10,8 @@ A desktop application for analysing and visualising Kerbal Space Program save-fi
 
 ## Features
 
-- **Kerbal Roster** — flights completed, current location, vessel assignment, synthetic experience rating, and full visit history per body
+- **Kerbal Roster** — star rating (computed from KSP XP), trait badges, missions, locations, join date and service duration per kerbal
+- **Corps Summary** — at-a-glance Pilot / Engineer / Scientist counts split by Assigned vs Available
 - **Contracts Dashboard** — visual progression timeline: cumulative earnings, contracts per period, earnings per period, prestige breakdown, and top destinations
 - **Contract Drill-down** — click any contract type to see its own filtered dashboard; TourismContract shows passenger counts instead of funds
 - **Incremental Parsing** — MD5-based cache avoids re-parsing an unchanged save file; force-refresh available
@@ -22,9 +23,13 @@ A desktop application for analysing and visualising Kerbal Space Program save-fi
 
 ## Screenshots
 
-**Kerbal Roster** — browse and search your crew with rating, location, and vessel info at a glance
+**Kerbal Roster** — corps summary bar (Pilots / Engineers / Scientists assigned vs available) and crew cards with star rating, missions, service duration, and top destinations
 
 ![Kerbal Roster](screenshots/kerbals.png)
+
+**Kerbal Detail** — full profile with star level, join date, service time, courage/stupidity bars, and every body visited
+
+![Kerbal Detail](screenshots/kerbal-detail.png)
 
 **Contract Statistics** — mission summary tiles, cumulative earnings curve, and per-period activity bars
 
@@ -33,10 +38,6 @@ A desktop application for analysing and visualising Kerbal Space Program save-fi
 **Contract Drill-down** — click any contract type to open a detailed modal with its own charts and top destinations
 
 ![Contract Drill-down](screenshots/contract-detail.png)
-
-**Kerbal Detail** — full profile: courage/stupidity bars, experience level, and every body visited
-
-![Kerbal Detail](screenshots/kerbal-detail.png)
 
 ---
 
