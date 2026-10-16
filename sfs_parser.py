@@ -47,14 +47,8 @@ class KerbalStats:
     current_vessel: str = ''
 
     hired_ut: float = 0.0  # UT (seconds) when rescued; 0.0 = veteran / unknown
-    body_activities: Dict[str, set] = field(default_factory=dict)  # body -> set of activities
-
-    def add_location(self, location: str):
-        """Aggiunge una visita a una location"""
-        if location in self.locations:
-            self.locations[location] += 1
-        else:
-            self.locations[location] = 1
+    body_activities: Dict[str, set] = field(default_factory=dict)   # body -> set of activity types
+    body_missions: Dict[str, set] = field(default_factory=dict)     # body -> set of mission indices
 
 
 @dataclass
@@ -264,14 +258,16 @@ class SFSParser:
                             pass
                     elif '=' in stripped:
                         key, _, value = stripped.partition('=')
-                        if key.strip().isdigit() and ',' in value:
+                        key_s = key.strip()
+                        if key_s.isdigit() and ',' in value:
+                            mission_idx = int(key_s)
                             event_type, _, body = value.strip().partition(',')
                             location = body.strip()
                             event_type = event_type.strip()
                             if location and current_kerbal_name and current_kerbal_name in kerbals:
                                 if in_flight_log or event_type in FLIGHT_EVENTS:
                                     k = kerbals[current_kerbal_name]
-                                    k.add_location(location)
+                                    k.body_missions.setdefault(location, set()).add(mission_idx)
                                     k.body_activities.setdefault(location, set()).add(event_type)
 
                 if stripped.startswith('{'):
@@ -620,6 +616,10 @@ class SFSParser:
         # Parse flight logs (CAREER_LOG + FLIGHT_LOG)
         print(f"Parsing flight logs for {len(kerbals)} kerbals...")
         kerbals = self.parse_flight_logs(kerbals)
+
+        # Derive visit counts: one per distinct mission index, not per event
+        for kerbal in kerbals.values():
+            kerbal.locations = {body: len(missions) for body, missions in kerbal.body_missions.items()}
 
         # Parse vessel assignments (current location + ship)
         print("Parsing vessel assignments...")
