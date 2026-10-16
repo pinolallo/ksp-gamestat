@@ -67,24 +67,66 @@ function bodyTier(loc) { return BODY_TIER[loc] || 1; }
 document.addEventListener('DOMContentLoaded', () => {
     initMissionClock();
     loadConfig();
-    // Show native Browse button when running inside Electron
-    if (window.electronAPI) {
-        const btn = document.getElementById('browseBtn');
-        if (btn) btn.style.display = '';
-    }
+    const btn = document.getElementById('browseBtn');
+    if (btn) btn.style.display = '';
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             closeKerbalDetail();
             closeContractDetail();
+            closeSavePicker();
         }
     });
 });
 
 async function browseForSfs() {
-    if (!window.electronAPI) return;
-    const selected = await window.electronAPI.selectSfsFile();
-    if (!selected) return;
-    document.getElementById('sfsPath').value = selected;
+    if (window.electronAPI) {
+        const selected = await window.electronAPI.selectSfsFile();
+        if (!selected) return;
+        document.getElementById('sfsPath').value = selected;
+        await configurePath();
+        return;
+    }
+    // Browser mode: scan server for KSP saves
+    const btn = document.getElementById('browseBtn');
+    btn.disabled = true;
+    btn.textContent = 'Scanning…';
+    try {
+        const saves = await fetch('/api/scan-saves').then(r => r.json());
+        showSavePicker(saves);
+    } catch (e) {
+        alert('Scan failed: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Browse…';
+    }
+}
+
+function showSavePicker(saves) {
+    document.getElementById('savePickerOverlay').style.display = 'flex';
+    const list = document.getElementById('savePickerList');
+    if (!saves.length) {
+        list.innerHTML = '<div class="save-picker-empty">No persistent.sfs files found.<br>Enter the path manually.</div>';
+        return;
+    }
+    list.innerHTML = saves.map((s, i) =>
+        `<div class="save-picker-item" onclick="selectSave(${i})" data-path="${escapeHtml(s.path)}">
+            <div class="save-picker-name">${escapeHtml(s.saveName || 'Unknown')}</div>
+            <div class="save-picker-game">${escapeHtml(s.gameName || '')}</div>
+            <div class="save-picker-path">${escapeHtml(s.path)}</div>
+        </div>`
+    ).join('');
+}
+
+function closeSavePicker() {
+    document.getElementById('savePickerOverlay').style.display = 'none';
+}
+
+async function selectSave(idx) {
+    const items = document.querySelectorAll('.save-picker-item');
+    const p = items[idx] && items[idx].dataset.path;
+    if (!p) return;
+    closeSavePicker();
+    document.getElementById('sfsPath').value = p;
     await configurePath();
 }
 
@@ -219,10 +261,10 @@ async function parseFile(force = false) {
         const data = await response.json();
         
         if (response.ok) {
-            if (data.cached) {
+            if (data.skipped) {
                 showToast('Data already up to date (cached)', 'success');
             } else {
-                showToast(`Parsing complete! ${data.stats.kerbals_parsed} Kerbals, ${data.stats.contracts_parsed} contract types`, 'success');
+                showToast(`Parsing complete! ${data.kerbals} Kerbals, ${data.tourists} tourists, ${data.contracts} contract types`, 'success');
             }
             
             // Reload data

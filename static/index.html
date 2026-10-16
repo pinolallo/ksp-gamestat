@@ -266,7 +266,7 @@
                             placeholder="/Users/sdipietr/Applications/Kerbal Space Program/saves/Conquer/persistent.sfs"
                             class="input-field"
                         >
-                        <button id="browseBtn" onclick="browseForSfs()" class="btn btn-secondary" style="display:none">
+                        <button id="browseBtn" onclick="browseForSfs()" class="btn btn-secondary">
                             Browse…
                         </button>
                         <button onclick="configurePath()" class="btn btn-primary">
@@ -361,6 +361,17 @@
                 <div class="modal-bars" id="modalBars"></div>
                 <div class="modal-locations" id="modalLocations"></div>
             </div>
+        </div>
+    </div>
+
+    <!-- Save file picker modal -->
+    <div class="modal-overlay" id="savePickerOverlay" style="display:none" onclick="if(event.target===this)closeSavePicker()">
+        <div class="modal-container save-picker-modal">
+            <div class="modal-header">
+                <h3>Select Save File</h3>
+                <button class="modal-close" onclick="closeSavePicker()">✕</button>
+            </div>
+            <div class="save-picker-list" id="savePickerList"></div>
         </div>
     </div>
 

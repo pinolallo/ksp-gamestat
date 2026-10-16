@@ -17,6 +17,7 @@ const STATIC_DIR = path.join(__dirname, '..', 'static');
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use('/static', express.static(STATIC_DIR));
 app.use(express.static(STATIC_DIR));
 
 let db;
@@ -30,6 +31,52 @@ try {
 
 // ── Health ────────────────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
+
+// ── Scan for KSP saves ────────────────────────────────────────────────────────
+app.get('/api/scan-saves', (_req, res) => {
+    const os   = require('os');
+    const home = os.homedir();
+    const searchRoots = [
+        path.join(home, 'Library', 'Application Support', 'Steam', 'steamapps', 'common', 'Kerbal Space Program', 'saves'),
+        path.join(home, 'Documents', 'Kerbal Space Program', 'saves'),
+        path.join(home, 'Documents', 'Gaming'),
+        path.join(home, 'Documents'),
+        path.join(home, 'Applications', 'Kerbal Space Program', 'saves'),
+        '/Applications/Kerbal Space Program/saves',
+        path.join(home, 'Library', 'Application Support', 'Steam', 'steamapps', 'common', 'Kerbal Space Program 2', 'saves'),
+    ];
+    const configured = db.getConfig('sfs_path', '');
+    if (configured) searchRoots.unshift(path.dirname(path.dirname(configured)));
+
+    const found = [];
+    const visited = new Set();
+
+    function scan(dir, depth) {
+        if (depth > 5 || visited.has(dir)) return;
+        visited.add(dir);
+        let entries;
+        try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return; }
+        for (const e of entries) {
+            if (e.name.startsWith('.')) continue;
+            const full = path.join(dir, e.name);
+            if (e.isFile() && e.name === 'persistent.sfs') {
+                const parts   = full.split(path.sep);
+                const saveName = parts[parts.length - 2] || '';
+                const gameIdx  = parts.findIndex(p => /kerbal/i.test(p));
+                const gameName = gameIdx >= 0 ? parts[gameIdx] : '';
+                found.push({ path: full, saveName, gameName });
+            } else if (e.isDirectory() && depth < 5) {
+                scan(full, depth + 1);
+            }
+        }
+    }
+
+    for (const root of searchRoots) {
+        if (fs.existsSync(root)) scan(root, 0);
+    }
+
+    res.json(found);
+});
 
 // ── Config ────────────────────────────────────────────────────────────────────
 app.get('/api/config', (_req, res) => {
@@ -103,15 +150,69 @@ app.post('/api/parse', async (req, res) => {
     }
 });
 
+// ── helpers ───────────────────────────────────────────────────────────────────
+function locArray(locations, bodyActivities) {
+    return Object.entries(locations)
+        .map(([loc, count]) => ({ location: loc, count, activities: bodyActivities[loc] || [] }))
+        .sort((a, b) => b.count - a.count);
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 app.get('/api/summary', (_req, res) => {
-    try { res.json(db.getSummary()); }
-    catch (err) { res.status(500).json({ error: String(err) }); }
+    try {
+        const kerbals     = db.getAllKerbals();
+        const corps       = {};
+        let   totalFlights = 0;
+        const locationSet = new Set();
+        for (const k of kerbals) {
+            if (!corps[k.trait]) corps[k.trait] = { assigned: 0, available: 0 };
+            if (k.state !== 'Available') corps[k.trait].assigned++;
+            else corps[k.trait].available++;
+            totalFlights += k.flights;
+            for (const loc of Object.keys(k.locations)) locationSet.add(loc);
+        }
+        const hist       = db.getContractHistory();
+        const totalFunds = hist.reduce((s, h) => s + (h.funds || 0), 0);
+        const last       = db.getLastParseRecord();
+        const s          = db.getSummary();
+        res.json({
+            summary: {
+                total_kerbals:    kerbals.length,
+                total_flights:    totalFlights,
+                total_contracts:  s.contracts,
+                total_funds:      totalFunds,
+                unique_locations: locationSet.size,
+                last_update:      last ? new Date(last.parsed_at * 1000).toISOString() : null,
+                game_ut:          last ? last.game_ut : 0,
+                corps,
+            },
+        });
+    } catch (err) { res.status(500).json({ error: String(err) }); }
 });
 
 // ── Kerbals ───────────────────────────────────────────────────────────────────
+function fmtKerbal(k) {
+    return {
+        name:             k.name,
+        trait:            k.trait,
+        state:            k.state,
+        experience_level: k.experienceLevel,
+        experience:       k.experience,
+        courage:          k.courage,
+        stupidity:        k.stupidity,
+        gender:           k.gender,
+        veteran:          k.veteran,
+        is_badass:        k.isBadass,
+        flights:          k.flights,
+        current_location: k.currentLocation,
+        current_vessel:   k.currentVessel,
+        hired_ut:         k.hiredUt,
+        locations:        locArray(k.locations, k.bodyActivities),
+    };
+}
+
 app.get('/api/kerbals', (_req, res) => {
-    try { res.json(db.getAllKerbals()); }
+    try { res.json({ kerbals: db.getAllKerbals().map(fmtKerbal) }); }
     catch (err) { res.status(500).json({ error: String(err) }); }
 });
 
@@ -119,38 +220,139 @@ app.get('/api/kerbals/:name', (req, res) => {
     try {
         const k = db.getKerbal(req.params.name);
         if (!k) return res.status(404).json({ error: 'Kerbal not found' });
-        res.json(k);
+        res.json(fmtKerbal(k));
     } catch (err) { res.status(500).json({ error: String(err) }); }
 });
 
 // ── Tourists ──────────────────────────────────────────────────────────────────
 app.get('/api/tourists', (_req, res) => {
-    try { res.json(db.getAllTourists()); }
-    catch (err) { res.status(500).json({ error: String(err) }); }
+    try {
+        const all = db.getAllTourists().map(t => ({
+            name:             t.name,
+            state:            t.state,
+            flights:          t.flights,
+            courage:          t.courage,
+            stupidity:        t.stupidity,
+            gender:           t.gender,
+            current_location: t.currentLocation,
+            current_vessel:   t.currentVessel,
+            contract_ut:      t.contractUt,
+            contract_body:    t.contractBody,
+            contract_agent:   t.contractAgent,
+            contract_guid:    t.contractGuid,
+            objectives:       t.objectives,
+            locations:        locArray(t.locations, t.bodyActivities),
+        }));
+        res.json({ tourists: all, count: all.length, flying: all.filter(t => t.state === 'Flying').length });
+    } catch (err) { res.status(500).json({ error: String(err) }); }
 });
 
 // ── Contracts ─────────────────────────────────────────────────────────────────
 app.get('/api/contracts', (_req, res) => {
-    try { res.json(db.getAllContracts()); }
-    catch (err) { res.status(500).json({ error: String(err) }); }
+    try {
+        const contracts = db.getAllContracts().map(c => ({
+            type:        c.contractType,
+            count:       c.count,
+            total_funds: c.totalFunds,
+            passengers:  c.passengers,
+        }));
+        res.json({ contracts });
+    } catch (err) { res.status(500).json({ error: String(err) }); }
 });
+
+const PRESTIGE_KEY = { 0: 'trivial', 1: 'significant', 2: 'exceptional' };
 
 app.get('/api/contracts/progress', (req, res) => {
     try {
         const type    = req.query.type || null;
         const history = db.getContractHistory(type);
-        res.json(history);
+        if (!history.length) {
+            return res.json({
+                success: true,
+                data: {
+                    metric: 'funds',
+                    summary: { total_count: 0, total_funds: 0, total_passengers: 0, start_label: '—', end_label: '—' },
+                    by_prestige: { trivial: {count:0,funds:0}, significant:{count:0,funds:0}, exceptional:{count:0,funds:0} },
+                    by_period: [],
+                    by_body:   [],
+                },
+            });
+        }
+
+        const isTourism = type === 'TourismContract';
+        const metric    = isTourism ? 'passengers' : 'funds';
+
+        const total_funds      = history.reduce((s, h) => s + (h.funds || 0), 0);
+        const total_passengers = history.reduce((s, h) => s + (h.passengers || 0), 0);
+
+        const by_prestige = { trivial:{count:0,funds:0}, significant:{count:0,funds:0}, exceptional:{count:0,funds:0} };
+        const byYear      = {};
+        const bodyMap     = {};
+
+        for (const h of history) {
+            const pk = PRESTIGE_KEY[h.prestige] || 'trivial';
+            by_prestige[pk].count++;
+            by_prestige[pk].funds += h.funds || 0;
+
+            const y = h.kspYear || 1;
+            if (!byYear[y]) byYear[y] = { count: 0, funds: 0, passengers: 0 };
+            byYear[y].count++;
+            byYear[y].funds      += h.funds      || 0;
+            byYear[y].passengers += h.passengers || 0;
+
+            if (h.bodyName) bodyMap[h.bodyName] = (bodyMap[h.bodyName] || 0) + 1;
+        }
+
+        let cumFunds = 0;
+        const by_period = Object.keys(byYear).sort((a, b) => a - b).map(y => {
+            cumFunds += byYear[y].funds;
+            return { label: `Y${y}`, count: byYear[y].count, funds: byYear[y].funds, cumulative_funds: cumFunds, passengers: byYear[y].passengers };
+        });
+
+        const by_body = Object.entries(bodyMap).map(([body, count]) => ({ body, count })).sort((a, b) => b.count - a.count);
+
+        res.json({
+            success: true,
+            data: {
+                metric,
+                summary: {
+                    total_count:      history.length,
+                    total_funds,
+                    total_passengers,
+                    start_label:      by_period.length ? by_period[0].label                    : '—',
+                    end_label:        by_period.length ? by_period[by_period.length - 1].label : '—',
+                },
+                by_prestige,
+                by_period,
+                by_body,
+            },
+        });
     } catch (err) { res.status(500).json({ error: String(err) }); }
 });
 
 // ── System info ───────────────────────────────────────────────────────────────
 app.get('/api/system-info', (_req, res) => {
     try {
-        const last = db.getLastParseRecord();
+        const last       = db.getLastParseRecord();
+        const parseCount = db.db.prepare('SELECT COUNT(*) AS c FROM parse_history').get().c;
+        const kerbCount  = db.db.prepare('SELECT COUNT(*) AS c FROM kerbals').get().c;
+        const ctCount    = db.db.prepare('SELECT COUNT(*) AS c FROM contracts').get().c;
         res.json({
-            db_size_bytes: db.getDbSize(),
-            db_path:       DB_PATH,
-            last_parse:    last || null,
+            info: {
+                metadata: {
+                    last_parsed: last ? new Date(last.parsed_at * 1000).toISOString() : null,
+                    parse_count: parseCount,
+                    file_hash:   last ? last.file_hash : null,
+                    duration_s:  last ? last.duration_s : null,
+                    game_ut:     last ? last.game_ut : null,
+                },
+                db_size_bytes: db.getDbSize(),
+                db_path:       DB_PATH,
+                db_rows: {
+                    kerbals:   kerbCount,
+                    contracts: ctCount,
+                },
+            },
         });
     } catch (err) { res.status(500).json({ error: String(err) }); }
 });
