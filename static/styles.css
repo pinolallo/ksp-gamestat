@@ -1728,3 +1728,82 @@ body {
     border-radius: 4px;
     color: var(--text-secondary);
 }
+
+.tourist-awaiting {
+    background: rgba(255, 217, 61, 0.12);
+    color: var(--warning);
+    border: 1px solid rgba(255, 217, 61, 0.35);
+}
+
+/* Returned tourists: grouped by contract */
+.tourist-returned-section {
+    grid-column: 1 / -1;
+    margin-top: 0.5rem;
+}
+
+.tourist-section-hdr {
+    font-family: var(--font-display);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.tourist-contract-group {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    animation: fadeIn 0.4s ease-out;
+    animation-fill-mode: both;
+}
+
+.tcg-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.tcg-date {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+}
+
+.tcg-agent {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tcg-count {
+    font-size: 0.65rem;
+    font-family: var(--font-display);
+    color: var(--accent-cyan);
+    opacity: 0.7;
+    white-space: nowrap;
+}
+
+.tcg-names {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+}
+
+.tcg-name {
+    font-size: 0.75rem;
+    padding: 0.15rem 0.55rem;
+    background: rgba(61, 220, 132, 0.08);
+    border: 1px solid rgba(61, 220, 132, 0.2);
+    border-radius: 4px;
+    color: var(--text-primary);
+}

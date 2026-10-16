@@ -150,6 +150,8 @@ class DatabaseManager:
                 current_vessel TEXT DEFAULT '',
                 contract_ut REAL DEFAULT 0.0,
                 contract_body TEXT DEFAULT '',
+                contract_agent TEXT DEFAULT '',
+                contract_guid TEXT DEFAULT '',
                 last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
@@ -524,10 +526,12 @@ class DatabaseManager:
             cursor.execute('''
                 INSERT INTO tourists
                     (name, state, flights, courage, stupidity, gender,
-                     current_location, current_vessel, contract_ut, contract_body, last_updated)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                     current_location, current_vessel, contract_ut, contract_body,
+                     contract_agent, contract_guid, last_updated)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             ''', (name, t.state, t.flights, t.courage, t.stupidity, t.gender,
-                  t.current_location, t.current_vessel, t.contract_ut, t.contract_body))
+                  t.current_location, t.current_vessel, t.contract_ut, t.contract_body,
+                  t.contract_agent, t.contract_guid))
 
             tourist_id = cursor.lastrowid
             for location, count in t.locations.items():
@@ -563,6 +567,8 @@ class DatabaseManager:
                 'current_vessel':   row['current_vessel'] or '',
                 'contract_ut':      row['contract_ut'] or 0.0,
                 'contract_body':    row['contract_body'] or '',
+                'contract_agent':   row['contract_agent'] or '',
+                'contract_guid':    row['contract_guid'] or '',
                 'locations':        [],
             }
             cursor.execute(

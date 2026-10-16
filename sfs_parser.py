@@ -55,7 +55,7 @@ class KerbalStats:
 class TouristRecord:
     """Statistiche per un singolo turista (attivo o storico)"""
     name: str
-    state: str = 'Returned'      # 'Flying' = ancora in roster; 'Returned' = da contratto storico
+    state: str = 'Returned'      # 'Flying'=in volo, 'Awaiting'=contratto ok ma non lanciato, 'Returned'=storico
     flights: int = 0
     courage: float = 0.0
     stupidity: float = 0.0
@@ -64,6 +64,8 @@ class TouristRecord:
     current_vessel: str = ''
     contract_ut: float = 0.0     # UT completamento contratto (0 = non noto)
     contract_body: str = ''      # corpo di destinazione dal contratto
+    contract_agent: str = ''     # agenzia del contratto
+    contract_guid: str = ''      # guid del contratto (per raggruppare returned)
     locations: Dict[str, int] = field(default_factory=dict)
     body_missions: Dict[str, set] = field(default_factory=dict)
     body_activities: Dict[str, set] = field(default_factory=dict)
@@ -294,7 +296,9 @@ class SFSParser:
         return kerbals
     
     def parse_tourist_roster(self) -> Dict[str, 'TouristRecord']:
-        """Parse ROSTER section for type=Tourist kerbals (currently flying)."""
+        """Parse ROSTER section for type=Tourist kerbals.
+        State mapping: Assigned→Flying, Available→Awaiting (contract ok, not yet launched).
+        """
         tourists: Dict[str, TouristRecord] = {}
         with open(self.filepath, 'r', encoding='utf-8', errors='ignore') as f:
             in_roster = False
@@ -302,6 +306,7 @@ class SFSParser:
             current_name = None
             current_type = None
             current_trait = ''
+            current_ksp_state = 'Available'
             current_courage = 0.0
             current_stupidity = 0.0
             current_gender = 'Male'
@@ -314,9 +319,11 @@ class SFSParser:
                     if in_kerbal and indent_level == 1:
                         is_tourist = (current_type == 'Tourist' or current_trait == 'Tourist')
                         if current_name and is_tourist:
+                            # Map KSP state to our state: Assigned = actually flying
+                            state = 'Flying' if current_ksp_state == 'Assigned' else 'Awaiting'
                             tourists[current_name] = TouristRecord(
                                 name=current_name,
-                                state='Flying',
+                                state=state,
                                 courage=current_courage,
                                 stupidity=current_stupidity,
                                 gender=current_gender,
@@ -336,6 +343,7 @@ class SFSParser:
                     current_name = None
                     current_type = None
                     current_trait = ''
+                    current_ksp_state = 'Available'
                     current_courage = 0.0
                     current_stupidity = 0.0
                     current_gender = 'Male'
@@ -346,6 +354,8 @@ class SFSParser:
                         current_type = stripped.split('=', 1)[1].strip()
                     elif stripped.startswith('trait ='):
                         current_trait = stripped.split('=', 1)[1].strip()
+                    elif stripped.startswith('state ='):
+                        current_ksp_state = stripped.split('=', 1)[1].strip()
                     elif stripped.startswith('brave ='):
                         try:
                             current_courage = float(stripped.split('=', 1)[1].strip())
@@ -374,6 +384,8 @@ class SFSParser:
             in_contract = False
             current_type = None
             current_body = ''
+            current_agent = ''
+            current_guid = ''
             current_ut = 0.0
             current_names: list = []
             indent_level = 0
@@ -391,9 +403,13 @@ class SFSParser:
                                         state='Returned',
                                         contract_ut=current_ut,
                                         contract_body=current_body,
+                                        contract_agent=current_agent,
+                                        contract_guid=current_guid,
                                     )
                         current_type = None
                         current_body = ''
+                        current_agent = ''
+                        current_guid = ''
                         current_ut = 0.0
                         current_names = []
                         in_contract = False
@@ -409,6 +425,10 @@ class SFSParser:
                 elif in_contract and indent_level == 2:
                     if stripped.startswith('type ='):
                         current_type = stripped.split('=', 1)[1].strip()
+                    elif stripped.startswith('agent ='):
+                        current_agent = stripped.split('=', 1)[1].strip()
+                    elif stripped.startswith('guid ='):
+                        current_guid = stripped.split('=', 1)[1].strip()
                     elif stripped.startswith('bodyName ='):
                         current_body = stripped.split('=', 1)[1].strip()
                     elif stripped.startswith('targetBody =') and not current_body:
@@ -518,7 +538,7 @@ class SFSParser:
                     abs_indent += 1
 
         for kerbal_name, kerbal in crew.items():
-            if getattr(kerbal, 'state', '') == 'Available':
+            if getattr(kerbal, 'state', '') in ('Available', 'Awaiting'):
                 kerbal.current_location = 'Kerbin (KSC)'
                 kerbal.current_vessel = ''
             elif getattr(kerbal, 'state', '') in ('Assigned', 'Flying'):

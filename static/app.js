@@ -455,11 +455,12 @@ function applyTouristFilters() {
         return matchName && matchState;
     });
 
+    const STATE_ORDER = { Flying: 0, Awaiting: 1, Returned: 2 };
     const sorts = {
-        date_desc: (a, b) => (b.contract_ut || 0) - (a.contract_ut || 0),
-        date_asc:  (a, b) => (a.contract_ut || 0) - (b.contract_ut || 0),
+        date_desc: (a, b) => (STATE_ORDER[a.state] - STATE_ORDER[b.state]) || (b.contract_ut || 0) - (a.contract_ut || 0),
+        date_asc:  (a, b) => (STATE_ORDER[a.state] - STATE_ORDER[b.state]) || (a.contract_ut || 0) - (b.contract_ut || 0),
         name:      (a, b) => a.name.localeCompare(b.name),
-        status:    (a, b) => (a.state === 'Flying' ? 0 : 1) - (b.state === 'Flying' ? 0 : 1),
+        status:    (a, b) => STATE_ORDER[a.state] - STATE_ORDER[b.state],
     };
     filtered.sort(sorts[sortKey] || sorts.date_desc);
 
@@ -473,58 +474,81 @@ function renderTourists(tourists) {
         return;
     }
 
-    grid.innerHTML = tourists.map((t, i) => {
-        const isFlying  = t.state === 'Flying';
-        const avatar    = t.gender === 'Female' ? '👩' : '👨';
-        const stateCls  = isFlying ? 'tourist-flying' : 'tourist-returned';
-        const stateIcon = isFlying ? '✈️ FLYING' : '✅ RETURNED';
+    const active    = tourists.filter(t => t.state === 'Flying' || t.state === 'Awaiting');
+    const returned  = tourists.filter(t => t.state === 'Returned');
+
+    const STATE_INFO = {
+        Flying:   { cls: 'tourist-flying',   label: '✈️ FLYING' },
+        Awaiting: { cls: 'tourist-awaiting', label: '📋 AWAITING' },
+        Returned: { cls: 'tourist-returned', label: '✅ RETURNED' },
+    };
+
+    // ── Active tourists (Flying + Awaiting) ──
+    const activeHtml = active.map((t, i) => {
+        const si     = STATE_INFO[t.state] || STATE_INFO.Flying;
+        const avatar = t.gender === 'Female' ? '👩' : '👨';
         const bodyBadge = t.contract_body
             ? `<span class="tourist-body-badge">${escapeHtml(t.contract_body)}</span>` : '';
-        const dateStr   = t.contract_ut > 0 ? kspDateStr(t.contract_ut) : '';
-
-        if (isFlying) {
-            const top3 = t.locations.slice(0, 3);
-            return `<div class="tourist-card tourist-card--flying" style="animation-delay:${i * 0.04}s">
-                <div class="tourist-header">
-                    <div class="tourist-avatar">${avatar}</div>
-                    <div class="tourist-info">
-                        <h3>${escapeHtml(t.name)}</h3>
-                        <div class="tourist-badges">
-                            <span class="tourist-state-badge ${stateCls}">${stateIcon}</span>
-                            ${bodyBadge}
-                        </div>
+        const top3   = t.locations.slice(0, 3);
+        const locStr = t.current_location && t.current_location !== 'Kerbin (KSC)'
+            ? t.current_location : (t.current_location || '');
+        return `<div class="tourist-card tourist-card--flying" style="animation-delay:${i * 0.04}s">
+            <div class="tourist-header">
+                <div class="tourist-avatar">${avatar}</div>
+                <div class="tourist-info">
+                    <h3>${escapeHtml(t.name)}</h3>
+                    <div class="tourist-badges">
+                        <span class="tourist-state-badge ${si.cls}">${si.label}</span>
+                        ${bodyBadge}
                     </div>
                 </div>
-                <div class="tourist-stats-row">
-                    <div class="tourist-stat"><div class="tourist-stat-label">MISSIONS</div><div class="tourist-stat-value">${t.flights}</div></div>
-                    <div class="tourist-stat"><div class="tourist-stat-label">LOCATIONS</div><div class="tourist-stat-value">${t.locations.length}</div></div>
-                    <div class="tourist-stat"><div class="tourist-stat-label">BRAVE</div><div class="tourist-stat-value">${(t.courage * 100).toFixed(0)}%</div></div>
-                </div>
-                ${t.current_location ? `
-                <div class="kerbal-current-location">
-                    <span>📍</span>
-                    <span class="current-loc-text">${escapeHtml(t.current_location)}</span>
-                    ${t.current_vessel ? `<span class="current-vessel-sep">•</span><span class="current-vessel-name">🚀 ${escapeHtml(t.current_vessel)}</span>` : ''}
-                </div>` : ''}
-                ${top3.length ? `<div class="tourist-locs">${top3.map(l =>
-                    `<span class="tourist-loc-tag">${escapeHtml(l.location)}</span>`).join('')}</div>` : ''}
-            </div>`;
-        } else {
-            return `<div class="tourist-card tourist-card--returned" style="animation-delay:${i * 0.02}s">
-                <div class="tourist-header">
-                    <div class="tourist-avatar tourist-avatar--small">${avatar}</div>
-                    <div class="tourist-info">
-                        <h3>${escapeHtml(t.name)}</h3>
-                        <div class="tourist-badges">
-                            <span class="tourist-state-badge ${stateCls}">${stateIcon}</span>
-                            ${bodyBadge}
-                            ${dateStr ? `<span class="tourist-date">📅 ${dateStr}</span>` : ''}
-                        </div>
-                    </div>
-                </div>
-            </div>`;
-        }
+            </div>
+            <div class="tourist-stats-row">
+                <div class="tourist-stat"><div class="tourist-stat-label">MISSIONS</div><div class="tourist-stat-value">${t.flights}</div></div>
+                <div class="tourist-stat"><div class="tourist-stat-label">LOCATIONS</div><div class="tourist-stat-value">${t.locations.length}</div></div>
+                <div class="tourist-stat"><div class="tourist-stat-label">BRAVE</div><div class="tourist-stat-value">${(t.courage * 100).toFixed(0)}%</div></div>
+            </div>
+            ${locStr ? `
+            <div class="kerbal-current-location">
+                <span>📍</span>
+                <span class="current-loc-text">${escapeHtml(locStr)}</span>
+                ${t.current_vessel ? `<span class="current-vessel-sep">•</span><span class="current-vessel-name">🚀 ${escapeHtml(t.current_vessel)}</span>` : ''}
+            </div>` : ''}
+            ${top3.length ? `<div class="tourist-locs">${top3.map(l =>
+                `<span class="tourist-loc-tag">${escapeHtml(l.location)}</span>`).join('')}</div>` : ''}
+        </div>`;
     }).join('');
+
+    // ── Returned tourists: grouped by contract_guid ──
+    const groups = new Map(); // guid → { agent, body, ut, names[] }
+    for (const t of returned) {
+        const key = t.contract_guid || `_${t.contract_ut}_${t.contract_body}`;
+        if (!groups.has(key)) {
+            groups.set(key, { agent: t.contract_agent, body: t.contract_body, ut: t.contract_ut, names: [] });
+        }
+        groups.get(key).names.push(t.name);
+    }
+
+    const groupsSorted = [...groups.values()].sort((a, b) => (b.ut || 0) - (a.ut || 0));
+
+    const returnedHtml = groupsSorted.length ? `
+        <div class="tourist-returned-section">
+            <div class="tourist-section-hdr">✅ RETURNED — ${returned.length} tourists in ${groupsSorted.length} missions</div>
+            ${groupsSorted.map((g, gi) => `
+            <div class="tourist-contract-group" style="animation-delay:${gi * 0.04}s">
+                <div class="tcg-header">
+                    ${g.body ? `<span class="tourist-body-badge">${escapeHtml(g.body)}</span>` : ''}
+                    ${g.ut > 0 ? `<span class="tcg-date">📅 ${kspDateStr(g.ut)}</span>` : ''}
+                    ${g.agent ? `<span class="tcg-agent">🏢 ${escapeHtml(g.agent)}</span>` : ''}
+                    <span class="tcg-count">${g.names.length} tourist${g.names.length > 1 ? 's' : ''}</span>
+                </div>
+                <div class="tcg-names">${g.names.map(n =>
+                    `<span class="tcg-name">${escapeHtml(n)}</span>`).join('')}
+                </div>
+            </div>`).join('')}
+        </div>` : '';
+
+    grid.innerHTML = activeHtml + returnedHtml;
 }
 
 // Load contracts
