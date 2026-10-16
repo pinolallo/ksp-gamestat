@@ -41,6 +41,7 @@
         ]
       }
     ],
+    "afterSign": "scripts/afterSign.js",
     "directories": {
       "buildResources": "build",
       "output": "dist"
