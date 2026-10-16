@@ -57,17 +57,21 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
-      - name: Build Electron app (Mac)
-        if: matrix.platform == 'mac'
-        run: npx electron-builder --mac --arch ${{ matrix.arch }} --publish never
+      - name: Build Electron app (Mac arm64)
+        if: matrix.platform == 'mac' && matrix.arch == 'arm64'
+        run: npx electron-builder --mac --arm64 --publish never
+
+      - name: Build Electron app (Mac x64)
+        if: matrix.platform == 'mac' && matrix.arch == 'x64'
+        run: npx electron-builder --mac --x64 --publish never
 
       - name: Build Electron app (Windows)
         if: matrix.platform == 'win'
-        run: npx electron-builder --win --arch ${{ matrix.arch }} --publish never
+        run: npx electron-builder --win --x64 --publish never
 
       - name: Build Electron app (Linux)
         if: matrix.platform == 'linux'
-        run: npx electron-builder --linux --arch ${{ matrix.arch }} --publish never
+        run: npx electron-builder --linux --x64 --publish never
 
       - name: List artifacts
         shell: bash
