@@ -126,8 +126,9 @@ class SFSParser:
                 if stripped.startswith('}'):
                     indent_level -= 1
                     if in_kerbal and indent_level == 1:
-                        is_tourist = (current_type == 'Tourist' or current_trait == 'Tourist')
-                        if current_name and not is_tourist:
+                        is_tourist   = (current_type == 'Tourist' or current_trait == 'Tourist')
+                        is_applicant = (current_type == 'Applicant')
+                        if current_name and not is_tourist and not is_applicant:
                             if current_name not in kerbals:
                                 kerbals[current_name] = KerbalStats(
                                     name=current_name,

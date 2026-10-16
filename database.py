@@ -377,7 +377,7 @@ class DatabaseManager:
         cursor.execute('''
             SELECT *
             FROM kerbals
-            WHERE is_tourist = 0 AND state != 'Available'
+            WHERE is_tourist = 0
             ORDER BY experience DESC, name ASC
         ''')
 
@@ -529,7 +529,7 @@ class DatabaseManager:
         cursor.execute('''
             SELECT trait, state, COUNT(*) as c
             FROM kerbals
-            WHERE is_tourist = 0 AND trait != '' AND state IN ('Assigned', 'Available')
+            WHERE is_tourist = 0 AND trait != ''  AND state IN ('Assigned', 'Available')
             GROUP BY trait, state
         ''')
         corps = {}
