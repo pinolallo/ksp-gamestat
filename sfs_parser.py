@@ -521,7 +521,7 @@ class SFSParser:
             if getattr(kerbal, 'state', '') == 'Available':
                 kerbal.current_location = 'Kerbin (KSC)'
                 kerbal.current_vessel = ''
-            elif getattr(kerbal, 'state', '') == 'Assigned':
+            elif getattr(kerbal, 'state', '') in ('Assigned', 'Flying'):
                 kerbal.current_location = location_map.get(kerbal_name, 'Unknown')
                 kerbal.current_vessel = vessel_map.get(kerbal_name, '')
             elif kerbal.state == 'Dead':
