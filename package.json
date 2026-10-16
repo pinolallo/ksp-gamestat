@@ -11,11 +11,14 @@
   "license": "MIT",
   "scripts": {
     "start": "electron .",
-    "build:backend": "./venv/bin/python -m PyInstaller ksp_gamestat.spec --clean --distpath dist_pyinstaller",
-    "build:backend:win": "venv\\Scripts\\python.exe -m PyInstaller ksp_gamestat.spec --clean --distpath dist_pyinstaller",
-    "build:mac": "npm run build:backend && electron-builder --mac",
-    "build:win": "npm run build:backend:win && electron-builder --win",
-    "build:linux": "npm run build:backend && electron-builder --linux"
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win",
+    "build:linux": "electron-builder --linux"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "cors": "^2.8.6",
+    "express": "^4.22.3"
   },
   "build": {
     "appId": "com.sdipietro.ksp-gamestat",
@@ -23,19 +26,24 @@
     "copyright": "Copyright Silvestro Di Pietro © 2026",
     "files": [
       "electron/**/*",
-      "!dist_pyinstaller/**",
+      "!dist/**",
       "!venv/**",
       "!**/__pycache__/**",
       "!*.pyc",
       "!*.spec",
-      "!*.db",
-      "!static/**",
-      "!*.py"
+      "!*.db"
     ],
     "extraResources": [
       {
-        "from": "dist_pyinstaller/ksp-gamestat-server",
-        "to": "backend",
+        "from": "server",
+        "to": "server",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "static",
+        "to": "static",
         "filter": [
           "**/*"
         ]

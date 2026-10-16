@@ -1,9 +1,8 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path   = require('path');
-const { spawn }   = require('child_process');
+const { fork }    = require('child_process');
 const net    = require('net');
 const http   = require('http');
-const fs     = require('fs');
 
 let mainWindow     = null;
 let backendProcess = null;
@@ -21,16 +20,12 @@ function findFreePort() {
     });
 }
 
-// ── Backend binary path ───────────────────────────────────────────────────────
-function getBackendPath() {
-    const exe = process.platform === 'win32'
-        ? 'ksp-gamestat-server.exe'
-        : 'ksp-gamestat-server';
-
+// ── Server script path ────────────────────────────────────────────────────────
+function getServerPath() {
     if (!app.isPackaged) {
-        return path.join(__dirname, '..', 'dist_pyinstaller', 'ksp-gamestat-server', exe);
+        return path.join(__dirname, '..', 'server', 'server.js');
     }
-    return path.join(process.resourcesPath, 'backend', exe);
+    return path.join(process.resourcesPath, 'server', 'server.js');
 }
 
 // ── Health poll ───────────────────────────────────────────────────────────────
@@ -59,38 +54,31 @@ function waitForBackend(port, maxAttempts = 40, intervalMs = 250) {
     });
 }
 
-// ── Spawn backend ─────────────────────────────────────────────────────────────
+// ── Fork backend ──────────────────────────────────────────────────────────────
 async function startBackend() {
     backendPort = await findFreePort();
 
-    const dbDir  = app.getPath('userData');
-    const dbPath = path.join(dbDir, 'ksp_stats.db');
-    const binary = getBackendPath();
-
-    if (!fs.existsSync(binary)) {
-        throw new Error(
-            `Backend binary not found:\n${binary}\n\nRun: npm run build:backend`
-        );
-    }
+    const dbDir    = app.getPath('userData');
+    const dbPath   = path.join(dbDir, 'ksp_stats.db');
+    const serverJs = getServerPath();
 
     const env = Object.assign({}, process.env, {
         KSP_PORT:    String(backendPort),
         KSP_DB_PATH: dbPath,
-        FLASK_ENV:   'production',
-        FLASK_DEBUG: '0',
+        NODE_ENV:    'production',
     });
 
-    backendProcess = spawn(binary, [], {
+    backendProcess = fork(serverJs, [], {
         env,
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
         windowsHide: true,
     });
 
-    backendProcess.stdout.on('data', d => console.log('[backend]', d.toString().trimEnd()));
-    backendProcess.stderr.on('data', d => console.error('[backend:err]', d.toString().trimEnd()));
+    backendProcess.stdout.on('data', d => console.log('[server]', d.toString().trimEnd()));
+    backendProcess.stderr.on('data', d => console.error('[server:err]', d.toString().trimEnd()));
 
     backendProcess.on('exit', (code, signal) => {
-        console.log(`Backend exited: code=${code} signal=${signal}`);
+        console.log(`Server exited: code=${code} signal=${signal}`);
         backendProcess = null;
         if (mainWindow && !mainWindow.isDestroyed()) {
             mainWindow.webContents.executeJavaScript(
@@ -102,11 +90,11 @@ async function startBackend() {
     });
 
     backendProcess.on('error', err => {
-        console.error('Failed to spawn backend:', err);
+        console.error('Failed to fork server:', err);
     });
 
     await waitForBackend(backendPort);
-    console.log(`Backend ready on port ${backendPort}`);
+    console.log(`Server ready on port ${backendPort}`);
 }
 
 // ── Window ────────────────────────────────────────────────────────────────────

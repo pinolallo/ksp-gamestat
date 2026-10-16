@@ -32,29 +32,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.13
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-          cache: 'pip'
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller
-
-      - name: Build PyInstaller backend
-        run: |
-          python -m PyInstaller ksp_gamestat.spec --clean --distpath dist_pyinstaller
-
       - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '20'
           cache: 'npm'
 
-      - name: Install Node dependencies
+      - name: Install dependencies
         run: npm ci
 
       - name: Build Electron app (Mac arm64)

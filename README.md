@@ -1,6 +1,6 @@
 # KSP GameStats — Mission Control Dashboard
 
-A desktop application for analysing and visualising Kerbal Space Program save-file statistics. Built with Electron + Python/Flask, it runs as a native app on macOS, Windows, and Linux — no Python installation required.
+A desktop application for analysing and visualising Kerbal Space Program save-file statistics. Built with Electron + Node.js/Express, it runs as a native app on macOS, Windows, and Linux — no external runtime required.
 
 ![KSP GameStats](https://img.shields.io/badge/KSP-GameStats-00d9ff?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/platform-mac%20%7C%20win%20%7C%20linux-lightgrey?style=for-the-badge)
@@ -108,7 +108,6 @@ The database is stored automatically in:
 
 ### Requirements
 
-- Python 3.8+
 - Node.js 18+
 - npm
 
@@ -119,25 +118,14 @@ The database is stored automatically in:
 git clone https://github.com/pinolallo/ksp-gamestat.git
 cd ksp-gamestat
 
-# Python backend
-python -m venv venv
-source venv/bin/activate          # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-
-# Node / Electron
 npm install
-
-# Build the backend binary (required before npm start)
-npm run build:backend             # Windows: npm run build:backend:win
-
-# Launch
 npm start
 ```
 
-The Flask server also runs standalone for browser-based development:
+The Express server also runs standalone for browser-based development:
 
 ```bash
-python app.py                     # Opens at http://localhost:4999
+KSP_PORT=4999 node server/server.js   # Opens at http://localhost:4999
 ```
 
 ### Build installers
@@ -152,16 +140,17 @@ npm run build:linux   # Linux AppImage + deb (requires Linux)
 
 ```
 ksp-gamestat/
-├── app.py                  Flask REST API (port configurable via KSP_PORT)
-├── sfs_parser.py           KSP .sfs save-file parser
-├── database.py             SQLite manager
-├── requirements.txt        Python dependencies (Flask, flask-cors)
-├── ksp_gamestat.spec       PyInstaller build spec
+├── server/
+│   ├── server.js           Express REST API (port via KSP_PORT env)
+│   ├── sfsParser.js        KSP .sfs save-file parser (Node.js)
+│   └── database.js         SQLite manager (better-sqlite3)
 ├── package.json            Electron + electron-builder config
 ├── electron/
-│   ├── main.js             Electron main process: spawn backend, IPC, window
+│   ├── main.js             Electron main process: fork server, IPC, window
 │   └── preload.js          Context bridge (native file picker)
-├── build/                  App icons and macOS entitlements
+├── build/                  App icons
+├── scripts/
+│   └── afterSign.js        Ad-hoc code signing hook (macOS)
 ├── .github/workflows/
 │   └── build.yml           CI matrix: mac (arm64+x64), win, linux
 └── static/
@@ -214,7 +203,7 @@ Then review and publish the draft release on GitHub.
 
 **Database issues** — delete `ksp_stats.db` from the user-data directory and re-parse. The schema is recreated automatically with migrations.
 
-**Backend does not start (dev mode)** — make sure `npm run build:backend` completed successfully and `dist_pyinstaller/ksp-gamestat-server/` exists.
+**Backend does not start (dev mode)** — run `npm install` to ensure `express`, `cors`, and `better-sqlite3` are installed.
 
 ---
 
