@@ -99,6 +99,9 @@
             <button class="tab-btn" data-tab="contracts" onclick="showTab('contracts', this)">
                 📋 Contracts
             </button>
+            <button class="tab-btn" data-tab="achievements" onclick="showTab('achievements', this)">
+                🏆 Achievements
+            </button>
             <button class="tab-btn tab-btn-admin" data-tab="admin" onclick="showTab('admin', this)">
                 ⚙️ Admin
             </button>
@@ -246,6 +249,13 @@
                 </table>
             </div>
         </section>
+        <!-- Achievements Tab -->
+        <section class="tab-content" id="achievementsTab">
+            <div id="achievementsContent">
+                <p class="text-center" style="color:var(--text-secondary);padding:3rem;">Parse the save file to load achievements.</p>
+            </div>
+        </section>
+
         <!-- Admin Tab -->
         <section class="tab-content" id="adminTab">
             <!-- Sub-section 1: System Configuration -->

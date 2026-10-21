@@ -472,6 +472,114 @@ class SFSParser {
         return currentUt;
     }
 
+    // ── World Achievements (ProgressTracking scenario) ────────────────────────
+    async parseAchievements() {
+        const BODY_SET = new Set(['Sun','Kerbin','Mun','Minmus','Eve','Gilly','Duna','Ike',
+                                   'Moho','Dres','Jool','Laythe','Vall','Bop','Tylo','Pol','Eeloo']);
+        let depth = 0;
+        let inPT = false, ptDepth = null;
+        let inProgress = false, progressDepth = null;
+        let pendingName = null;
+        let bodyName = null, bodyContentDepth = null;
+        let achName  = null, achContentDepth  = null;
+        let mileName = null, mileContentDepth = null;
+        let subBlock = null, subContentDepth  = null;
+        let curAch = null, curVessel = null, curCrew = null;
+        const global = {}, bodies = {};
+
+        for await (const line of readLines(this.filepath)) {
+            const s = line.trim();
+            if (!s) continue;
+
+            if (s.startsWith('}')) {
+                depth--;
+                if (subContentDepth !== null && depth < subContentDepth) {
+                    if (subBlock === 'vessel' && curAch) curAch.vessel = curVessel || null;
+                    if (subBlock === 'crew'   && curAch) curAch.crew   = curCrew   || [];
+                    subBlock = null; subContentDepth = null; curVessel = null; curCrew = null;
+                } else if (achContentDepth !== null && depth < achContentDepth) {
+                    if (achName && curAch && bodyName) {
+                        if (!bodies[bodyName]) bodies[bodyName] = { reached: null, achievements: {} };
+                        bodies[bodyName].achievements[achName] = curAch;
+                    }
+                    achName = null; achContentDepth = null; curAch = null;
+                } else if (bodyContentDepth !== null && depth < bodyContentDepth) {
+                    bodyName = null; bodyContentDepth = null;
+                } else if (mileContentDepth !== null && depth < mileContentDepth) {
+                    if (mileName && curAch) global[mileName] = curAch;
+                    mileName = null; mileContentDepth = null; curAch = null;
+                } else if (progressDepth !== null && depth < progressDepth) {
+                    inProgress = false; progressDepth = null;
+                    return { global, bodies };
+                } else if (ptDepth !== null && depth < ptDepth) {
+                    inPT = false; ptDepth = null;
+                }
+            } else if (s.startsWith('{')) {
+                depth++;
+                if (pendingName !== null) {
+                    const pn = pendingName; pendingName = null;
+                    if (inPT && !inProgress && pn === 'Progress') {
+                        inProgress = true; progressDepth = depth;
+                    } else if (inProgress) {
+                        if (bodyName === null && mileName === null && achName === null) {
+                            if (BODY_SET.has(pn)) {
+                                bodyName = pn; bodyContentDepth = depth;
+                                if (!bodies[bodyName]) bodies[bodyName] = { reached: null, achievements: {} };
+                            } else {
+                                mileName = pn; mileContentDepth = depth;
+                                curAch = { ut: null, manned: null, crew: [], vessel: null };
+                            }
+                        } else if (bodyName !== null && achName === null && subBlock === null) {
+                            achName = pn; achContentDepth = depth;
+                            curAch = { ut: null, manned: null, crew: [], vessel: null };
+                        } else if ((achName !== null || mileName !== null) && subBlock === null) {
+                            if (['vessel','crew','base','station'].includes(pn)) {
+                                subBlock = pn; subContentDepth = depth;
+                                curVessel = {}; curCrew = [];
+                            }
+                        }
+                    }
+                }
+            } else if (s.includes('=')) {
+                const eqIdx = s.indexOf('=');
+                const key = s.slice(0, eqIdx).trim();
+                const v   = s.slice(eqIdx + 1).trim();
+
+                if (!inPT && key === 'name' && v === 'ProgressTracking') {
+                    inPT = true; ptDepth = depth;
+                }
+
+                if (inProgress) {
+                    if (subBlock === 'vessel') {
+                        if (!curVessel) curVessel = {};
+                        if      (key === 'name') curVessel.name = v;
+                        else if (key === 'flag') curVessel.flag = v;
+                    } else if (subBlock === 'crew') {
+                        if (key === 'crews') curCrew = v.split(',').map(c => c.trim()).filter(Boolean);
+                    } else if (achName !== null && curAch) {
+                        const ut = parseFloat(v);
+                        if      (key === 'completed')             { curAch.ut = ut; curAch.manned = true; }
+                        else if (key === 'completedUnmanned')     { curAch.ut = ut; curAch.manned = false; }
+                        else if (key === 'completedManned' || key === 'completedMannedCrew') { curAch.ut = ut; curAch.manned = true; }
+                        else if (key === 'reached')               { curAch.ut = ut; curAch.manned = null; }
+                        else if (key === 'record')                curAch.record = parseFloat(v);
+                    } else if (bodyName !== null && achName === null && key === 'reached') {
+                        if (!bodies[bodyName]) bodies[bodyName] = { reached: null, achievements: {} };
+                        bodies[bodyName].reached = parseFloat(v) || null;
+                    } else if (mileName !== null && curAch) {
+                        const ut = parseFloat(v);
+                        if      (key === 'completed') { curAch.ut = ut; curAch.manned = true; }
+                        else if (key === 'reached')   { curAch.ut = ut; curAch.manned = null; }
+                        else if (key === 'record')    curAch.record = parseFloat(v);
+                    }
+                }
+            } else {
+                pendingName = s;
+            }
+        }
+        return { global, bodies };
+    }
+
     // ── Full Parse ────────────────────────────────────────────────────────────
     async parseAll() {
         const fileHash = await this.calculateFileHash();
@@ -529,11 +637,15 @@ class SFSParser {
         const contractHistory = await this.parseContractHistory();
         console.log(`Contract history: ${contractHistory.length} records`);
 
+        console.log('Parsing world achievements...');
+        const achievements = await this.parseAchievements();
+        console.log(`Achievements: ${Object.keys(achievements.bodies).length} bodies, ${Object.keys(achievements.global).length} milestones`);
+
         for (const name of Object.keys(kerbals)) {
             if (kerbals[name].isTourist) delete kerbals[name];
         }
 
-        return { kerbals, allTourists, contracts, contractHistory, fileHash, gameUt };
+        return { kerbals, allTourists, contracts, contractHistory, fileHash, gameUt, achievements };
     }
 }
 

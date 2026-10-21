@@ -169,6 +169,7 @@ async function loadConfig() {
             await loadKerbals();
             await loadTourists();
             await loadContracts();
+            await loadAchievements();
         } else {
             // Not configured: show tab nav and route to Admin
             document.getElementById('tabsNav').style.display = 'flex';
@@ -272,6 +273,7 @@ async function parseFile(force = false) {
             await loadKerbals();
             await loadTourists();
             await loadContracts();
+            await loadAchievements();
 
             // Redirect to Kerbals tab after successful parse from Admin
             if (document.getElementById('adminTab').classList.contains('active')) {
@@ -673,12 +675,13 @@ function showTab(tabName, triggerEl) {
 
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
 
-    const panels = { kerbals: 'kerbalsTab', tourists: 'touristsTab', contracts: 'contractsTab', admin: 'adminTab' };
+    const panels = { kerbals: 'kerbalsTab', tourists: 'touristsTab', contracts: 'contractsTab', achievements: 'achievementsTab', admin: 'adminTab' };
     const target = document.getElementById(panels[tabName]);
     if (target) target.classList.add('active');
 
-    if (tabName === 'admin')     loadSystemInfo();
-    if (tabName === 'contracts') loadContractProgress();
+    if (tabName === 'admin')        loadSystemInfo();
+    if (tabName === 'contracts')   loadContractProgress();
+    if (tabName === 'achievements') loadAchievements();
 }
 
 // Load system info for Admin tab
@@ -1247,4 +1250,183 @@ function populateContractModal(contractType, data) {
 function closeContractDetail(event) {
     if (event && event.target !== document.getElementById('contractModal')) return;
     document.getElementById('contractModal').classList.remove('modal-visible');
+}
+
+// ── Achievements Tab ──────────────────────────────────────────────────
+
+async function loadAchievements() {
+    try {
+        const res  = await fetch(`${API_BASE}/achievements`);
+        const data = await res.json();
+        renderAchievements(data);
+    } catch (err) {
+        console.error('Error loading achievements:', err);
+    }
+}
+
+const BODY_ORDER = [
+    { name: 'Kerbin',  emoji: '🌍', color: '#3ddc84' },
+    { name: 'Mun',     emoji: '🌑', color: '#8fa3c7' },
+    { name: 'Minmus',  emoji: '🟢', color: '#5ecfa3' },
+    { name: 'Eve',     emoji: '🟣', color: '#b468d8' },
+    { name: 'Gilly',   emoji: '🪨', color: '#8b7355' },
+    { name: 'Duna',    emoji: '🔴', color: '#ff6b35' },
+    { name: 'Ike',     emoji: '⚫', color: '#7a8a9c' },
+    { name: 'Moho',    emoji: '🟤', color: '#c47c4a' },
+    { name: 'Dres',    emoji: '💠', color: '#5ba3cc' },
+    { name: 'Jool',    emoji: '🟩', color: '#4aaa5e' },
+    { name: 'Laythe',  emoji: '🌊', color: '#00d9ff' },
+    { name: 'Vall',    emoji: '❄️',  color: '#a8d8ea' },
+    { name: 'Tylo',    emoji: '🔵', color: '#5ba3f5' },
+    { name: 'Bop',     emoji: '🟤', color: '#8b6914' },
+    { name: 'Pol',     emoji: '💛', color: '#c9a832' },
+    { name: 'Eeloo',   emoji: '⚪', color: '#b0b8c8' },
+    { name: 'Sun',     emoji: '☀️',  color: '#ffd93d' },
+];
+
+const ACH_DISPLAY = [
+    { key: 'Flyby',               label: 'Flyby' },
+    { key: 'Orbit',               label: 'Orbit' },
+    { key: 'Suborbit',            label: 'Suborbit' },
+    { key: 'Escape',              label: 'Escape' },
+    { key: 'Flight',              label: 'Flight' },
+    { key: 'Landing',             label: 'Landing' },
+    { key: 'Splashdown',          label: 'Splashdown' },
+    { key: 'SurfaceEVA',          label: 'EVA' },
+    { key: 'Spacewalk',           label: 'Spacewalk' },
+    { key: 'FlagPlant',           label: 'Flag' },
+    { key: 'Science',             label: 'Science' },
+    { key: 'Rendezvous',          label: 'Rendezvous' },
+    { key: 'Docking',             label: 'Docking' },
+    { key: 'BaseConstruction',    label: 'Base' },
+    { key: 'StationConstruction', label: 'Station' },
+    { key: 'ReturnFromOrbit',     label: 'Rtn↑Orbit' },
+    { key: 'ReturnFromSurface',   label: 'Rtn↓Surface' },
+];
+
+const MILESTONE_CONFIG = [
+    { key: 'FirstLaunch',        label: 'First Launch',        icon: '🚀' },
+    { key: 'ReachedSpace',       label: 'Reached Space',       icon: '⭐' },
+    { key: 'FirstCrewToSurvive', label: 'First Crew Survived', icon: '🦺' },
+    { key: 'KSCLanding',         label: 'KSC Landing',         icon: '🏁' },
+    { key: 'RunwayLanding',      label: 'Runway Landing',      icon: '✈️' },
+    { key: 'RecordsAltitude',    label: 'Altitude Record',     icon: '📏' },
+    { key: 'RecordsSpeed',       label: 'Speed Record',        icon: '⚡' },
+    { key: 'RecordsDistance',    label: 'Distance Record',     icon: '📐' },
+    { key: 'RecordsDepth',       label: 'Depth Record',        icon: '🌊' },
+];
+
+function renderAchievements(data) {
+    const el = document.getElementById('achievementsContent');
+    if (!data || (Object.keys(data.global || {}).length === 0 && Object.keys(data.bodies || {}).length === 0)) {
+        el.innerHTML = '<p class="text-center" style="color:var(--text-secondary);padding:3rem;">Parse the save file to load achievements.</p>';
+        return;
+    }
+
+    const globalHtml  = renderMilestones(data.global || {});
+    const bodiesHtml  = renderBodyGrid(data.bodies || {});
+    el.innerHTML = globalHtml + bodiesHtml;
+}
+
+function renderMilestones(global) {
+    const known = MILESTONE_CONFIG.filter(m => global[m.key]);
+    const pois  = Object.entries(global)
+        .filter(([k]) => k.startsWith('POI') && global[k].ut)
+        .sort(([,a],[,b]) => (a.ut || 0) - (b.ut || 0));
+
+    if (!known.length && !pois.length) return '';
+
+    const cards = known.map(m => {
+        const ach = global[m.key];
+        const date = ach.ut ? kspDateStr(ach.ut) : '—';
+        const crew = ach.crew && ach.crew.length ? ach.crew.slice(0, 2).join(', ') + (ach.crew.length > 2 ? ` +${ach.crew.length - 2}` : '') : '';
+        const vessel = ach.vessel ? ach.vessel.name : '';
+        return `<div class="milestone-card milestone-card--done">
+            <div class="milestone-icon">${m.icon}</div>
+            <div class="milestone-body">
+                <div class="milestone-label">${m.label}</div>
+                <div class="milestone-date">${date}</div>
+                ${vessel ? `<div class="milestone-detail">🚀 ${escapeHtml(vessel)}</div>` : ''}
+                ${crew ? `<div class="milestone-detail">👨‍🚀 ${escapeHtml(crew)}</div>` : ''}
+            </div>
+        </div>`;
+    }).join('');
+
+    const poiCards = pois.map(([key, ach]) => {
+        const label = key.replace(/^POI/, '').replace(/([A-Z])/g, ' $1').trim();
+        const date  = ach.ut ? kspDateStr(ach.ut) : '—';
+        const vessel = ach.vessel ? ach.vessel.name : '';
+        return `<div class="milestone-card milestone-card--poi">
+            <div class="milestone-icon">📍</div>
+            <div class="milestone-body">
+                <div class="milestone-label">${escapeHtml(label)}</div>
+                <div class="milestone-date">${date}</div>
+                ${vessel ? `<div class="milestone-detail">🚀 ${escapeHtml(vessel)}</div>` : ''}
+            </div>
+        </div>`;
+    }).join('');
+
+    return `
+    <div class="ach-section">
+        <div class="panel-header"><h2>🏆 Programme Milestones</h2></div>
+        <div class="milestone-grid">${cards}</div>
+        ${pois.length ? `<div class="panel-header" style="margin-top:1.5rem;"><h3 class="ach-subsection-title">📍 Points of Interest (${pois.length})</h3></div><div class="milestone-grid milestone-grid--poi">${poiCards}</div>` : ''}
+    </div>`;
+}
+
+function renderBodyGrid(bodies) {
+    const cards = BODY_ORDER.map(b => {
+        const bd = bodies[b.name];
+        if (!bd) {
+            return `<div class="body-ach-card body-ach-card--locked">
+                <div class="body-ach-header" style="--body-color:${b.color}">
+                    <span class="body-emoji">${b.emoji}</span>
+                    <span class="body-name">${b.name}</span>
+                    <span class="body-reached body-reached--never">not reached</span>
+                </div>
+                <div class="body-ach-badges body-ach-badges--locked">
+                    <span class="ach-lock">🔒 Unexplored</span>
+                </div>
+            </div>`;
+        }
+
+        const reached = bd.reached ? kspDateStr(bd.reached) : '?';
+        const achs    = bd.achievements || {};
+        const total   = ACH_DISPLAY.filter(a => achs[a.key]).length;
+
+        const badges = ACH_DISPLAY.map(a => {
+            const ach = achs[a.key];
+            if (!ach) {
+                return `<span class="ach-badge ach-badge--locked" title="${a.label}: not achieved">${a.label}</span>`;
+            }
+            const cls   = ach.manned === false ? 'ach-badge--unmanned' : 'ach-badge--manned';
+            const title = buildAchTooltip(a.label, ach);
+            return `<span class="ach-badge ${cls}" title="${escapeHtml(title)}">${a.label}</span>`;
+        }).join('');
+
+        return `<div class="body-ach-card">
+            <div class="body-ach-header" style="--body-color:${b.color}">
+                <span class="body-emoji">${b.emoji}</span>
+                <span class="body-name">${b.name}</span>
+                <span class="body-reached">reached ${reached}</span>
+                <span class="body-ach-count">${total}/${ACH_DISPLAY.length}</span>
+            </div>
+            <div class="body-ach-badges">${badges}</div>
+        </div>`;
+    }).join('');
+
+    return `
+    <div class="ach-section" style="margin-top:2rem;">
+        <div class="panel-header"><h2>🌍 Solar System Progress</h2></div>
+        <div class="body-ach-grid">${cards}</div>
+    </div>`;
+}
+
+function buildAchTooltip(label, ach) {
+    const parts = [label];
+    if (ach.ut)    parts.push(kspDateStr(ach.ut));
+    if (ach.manned === false) parts.push('unmanned');
+    if (ach.vessel && ach.vessel.name) parts.push('🚀 ' + ach.vessel.name);
+    if (ach.crew  && ach.crew.length)  parts.push('👨‍🚀 ' + ach.crew.slice(0, 3).join(', '));
+    return parts.join(' · ');
 }

@@ -381,6 +381,17 @@ class KSPDatabase {
         };
     }
 
+    // ── Achievements ───────────────────────────────────────────────────────────
+    saveAchievements(data) {
+        this.setConfig('achievements_json', JSON.stringify(data));
+    }
+
+    getAchievements() {
+        const json = this.getConfig('achievements_json', null);
+        if (!json) return null;
+        try { return JSON.parse(json); } catch (_) { return null; }
+    }
+
     getDbSize() {
         try { return fs.statSync(this.dbPath).size; } catch (_) { return 0; }
     }

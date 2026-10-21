@@ -119,7 +119,7 @@ app.post('/api/parse', async (req, res) => {
     try {
         console.log('Parsing', sfsPath, '...');
         const result = await parser.parseAll();
-        const { kerbals, allTourists, contracts, contractHistory, gameUt } = result;
+        const { kerbals, allTourists, contracts, contractHistory, gameUt, achievements } = result;
 
         console.log(`Saving ${Object.keys(kerbals).length} kerbals ...`);
         db.saveKerbals(kerbals);
@@ -129,6 +129,8 @@ app.post('/api/parse', async (req, res) => {
         db.saveContracts(contracts);
         console.log(`Saving ${contractHistory.length} contract history records ...`);
         db.saveContractHistory(contractHistory);
+        console.log('Saving achievements...');
+        db.saveAchievements(achievements);
 
         const durationS = (Date.now() - t0) / 1000;
         db.saveParseRecord(sfsPath, fileHash, durationS, gameUt);
@@ -344,6 +346,14 @@ app.get('/api/contracts/progress', (req, res) => {
                 by_body,
             },
         });
+    } catch (err) { res.status(500).json({ error: String(err) }); }
+});
+
+// ── Achievements ──────────────────────────────────────────────────────────────
+app.get('/api/achievements', (_req, res) => {
+    try {
+        const data = db.getAchievements();
+        res.json(data || { global: {}, bodies: {} });
     } catch (err) { res.status(500).json({ error: String(err) }); }
 });
 
