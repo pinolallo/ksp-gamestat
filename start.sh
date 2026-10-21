@@ -1,40 +1,27 @@
 #!/bin/bash
+set -e
+
+PORT="${KSP_PORT:-4999}"
 
 echo "=================================="
 echo "  KSP GameStats - Mission Control"
 echo "=================================="
 echo ""
 
-# Verifica Python
-if ! command -v python3 &> /dev/null; then
-    echo "❌ Python 3 non trovato. Installalo prima di continuare."
+if ! command -v node &> /dev/null; then
+    echo "❌ Node.js not found. Install it from https://nodejs.org"
     exit 1
 fi
 
-echo "✓ Python 3 trovato"
-
-# Verifica e installa dipendenze
-if [ ! -d "venv" ]; then
-    echo "📦 Creazione ambiente virtuale..."
-    python3 -m venv venv
-    source venv/bin/activate
-    echo "📦 Installazione dipendenze..."
-    pip install -r requirements.txt
-else
-    source venv/bin/activate
+if [ ! -d "node_modules" ]; then
+    echo "📦 Installing dependencies..."
+    npm install
 fi
 
-echo "✓ Dipendenze installate"
+echo "🚀 Starting server on http://127.0.0.1:${PORT}"
+echo "   Press Ctrl+C to stop."
 echo ""
 
-# Configura path (opzionale)
-if [ -z "$KSP_SFS_PATH" ]; then
-    echo "💡 Tip: Puoi configurare il path del file .sfs con:"
-    echo "   export KSP_SFS_PATH='/path/to/persistent.sfs'"
-    echo ""
-fi
+open "http://127.0.0.1:${PORT}" 2>/dev/null &
 
-# Avvia server
-echo "🚀 Avvio server..."
-echo ""
-python app.py
+KSP_PORT="$PORT" node server/server.js

@@ -169,6 +169,7 @@ async function loadConfig() {
             await loadKerbals();
             await loadTourists();
             await loadContracts();
+            await loadVessels();
             await loadAchievements();
         } else {
             // Not configured: show tab nav and route to Admin
@@ -273,6 +274,7 @@ async function parseFile(force = false) {
             await loadKerbals();
             await loadTourists();
             await loadContracts();
+            await loadVessels();
             await loadAchievements();
 
             // Redirect to Kerbals tab after successful parse from Admin
@@ -675,12 +677,13 @@ function showTab(tabName, triggerEl) {
 
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
 
-    const panels = { kerbals: 'kerbalsTab', tourists: 'touristsTab', contracts: 'contractsTab', achievements: 'achievementsTab', admin: 'adminTab' };
+    const panels = { kerbals: 'kerbalsTab', tourists: 'touristsTab', contracts: 'contractsTab', vessels: 'vesselsTab', achievements: 'achievementsTab', admin: 'adminTab' };
     const target = document.getElementById(panels[tabName]);
     if (target) target.classList.add('active');
 
     if (tabName === 'admin')        loadSystemInfo();
     if (tabName === 'contracts')   loadContractProgress();
+    if (tabName === 'vessels')     loadVessels();
     if (tabName === 'achievements') loadAchievements();
 }
 
@@ -1250,6 +1253,133 @@ function populateContractModal(contractType, data) {
 function closeContractDetail(event) {
     if (event && event.target !== document.getElementById('contractModal')) return;
     document.getElementById('contractModal').classList.remove('modal-visible');
+}
+
+// ── Vessels Tab ───────────────────────────────────────────────────────
+
+let vesselsData = [];
+
+async function loadVessels() {
+    try {
+        const res  = await fetch(`${API_BASE}/vessels`);
+        const data = await res.json();
+        if (data.vessels) {
+            vesselsData = data.vessels;
+            document.getElementById('vesselTotal').textContent = data.count;
+            applyVesselFilters();
+        }
+    } catch (err) { console.error('Error loading vessels:', err); }
+}
+
+function vesselLocType(loc) {
+    if (!loc) return 'unknown';
+    if (loc.includes('(landed)') || loc.includes('LANDED') || loc.includes('PRELAUNCH')) return 'landed';
+    if (loc.includes('(splashed)')) return 'splashed';
+    if (loc.startsWith('Orbiting '))  return 'orbit';
+    if (loc.startsWith('Sub-orbital')) return 'suborbit';
+    if (loc.startsWith('Escaping'))   return 'escape';
+    return 'unknown';
+}
+
+function vesselLocLabel(loc) {
+    if (!loc) return '?';
+    if (loc.includes('(landed)'))     return '🛬 ' + loc.replace(' (landed)', '');
+    if (loc.includes('(splashed)'))   return '🌊 ' + loc.replace(' (splashed)', '');
+    if (loc.startsWith('Orbiting '))  return '🔄 ' + loc.replace('Orbiting ', '');
+    if (loc.startsWith('Sub-orbital'))return '↗ ' + loc;
+    if (loc.startsWith('Escaping'))   return '🚀 ' + loc;
+    return '📍 ' + loc;
+}
+
+const VESSEL_LOC_CLS = {
+    orbit:    'vloc-orbit',
+    landed:   'vloc-landed',
+    splashed: 'vloc-splashed',
+    suborbit: 'vloc-suborbit',
+    escape:   'vloc-escape',
+    unknown:  'vloc-unknown',
+};
+
+function applyVesselFilters() {
+    const search    = (document.getElementById('vesselSearch').value || '').toLowerCase();
+    const sortKey   = document.getElementById('vesselSortSelect').value;
+    const locFilter = document.getElementById('vesselLocFilter').value;
+
+    let filtered = vesselsData.filter(v => {
+        if (locFilter !== 'all' && vesselLocType(v.location) !== locFilter) return false;
+        if (!search) return true;
+        return v.name.toLowerCase().includes(search) ||
+               v.location.toLowerCase().includes(search) ||
+               v.crew.some(c => c.name.toLowerCase().includes(search));
+    });
+
+    const sorts = {
+        name:      (a, b) => a.name.localeCompare(b.name),
+        crew:      (a, b) => b.crew_count - a.crew_count,
+        pilot:     (a, b) => b.best_pilot     - a.best_pilot     || a.name.localeCompare(b.name),
+        engineer:  (a, b) => b.best_engineer  - a.best_engineer  || a.name.localeCompare(b.name),
+        scientist: (a, b) => b.best_scientist - a.best_scientist || a.name.localeCompare(b.name),
+    };
+    filtered.sort(sorts[sortKey] || sorts.name);
+
+    document.getElementById('vesselShowing').textContent = filtered.length;
+    renderVessels(filtered);
+}
+
+function renderVessels(vessels) {
+    const grid = document.getElementById('vesselsGrid');
+    if (!vessels.length) {
+        grid.innerHTML = '<p class="text-center" style="color:var(--text-secondary);padding:2rem;grid-column:1/-1;">No vessels match the current filters.</p>';
+        return;
+    }
+
+    grid.innerHTML = vessels.map((v, i) => {
+        const locType  = vesselLocType(v.location);
+        const locLabel = vesselLocLabel(v.location);
+        const locCls   = VESSEL_LOC_CLS[locType] || 'vloc-unknown';
+
+        const byTrait = { Pilot: [], Engineer: [], Scientist: [] };
+        for (const c of v.crew) if (byTrait[c.trait]) byTrait[c.trait].push(c);
+        Object.values(byTrait).forEach(arr => arr.sort((a, b) => b.experience_level - a.experience_level));
+
+        const capsule = ['Pilot','Engineer','Scientist'].map(trait => {
+            const arr  = byTrait[trait];
+            const best = arr[0];
+            if (!best) return `<div class="vessel-cap vessel-cap--empty"><span class="vessel-cap-icon">${TRAIT_AVATAR[trait]}</span><span class="vessel-cap-none">—</span></div>`;
+            const extras = arr.length > 1 ? `<span class="vessel-cap-extra">+${arr.length - 1}</span>` : '';
+            return `<div class="vessel-cap">
+                <span class="vessel-cap-icon">${TRAIT_AVATAR[trait]}</span>
+                <span class="vessel-cap-stars">${starRating(best.experience_level)}</span>
+                <span class="vessel-cap-name">${escapeHtml(best.name.replace(' Kerman', ''))}</span>
+                ${extras}
+            </div>`;
+        }).join('');
+
+        const crewPills = v.crew.map(c => {
+            const avatar = TRAIT_AVATAR[c.trait] || (c.gender === 'Female' ? '👩‍🚀' : '👨‍🚀');
+            const badges = [];
+            if (c.veteran)   badges.push('V');
+            if (c.is_badass) badges.push('B');
+            const suffix = badges.length ? ` <span class="vessel-crew-badge">${badges.join('')}</span>` : '';
+            const traitCls = c.trait ? `vcrew-${c.trait.toLowerCase()}` : '';
+            return `<span class="vessel-crew-pill ${traitCls}" title="${escapeHtml(c.name)} · ${c.trait} ${starRating(c.experience_level)} · ${c.flights} flights">
+                ${avatar} ${escapeHtml(c.name.replace(' Kerman', ''))}${suffix} <span class="vessel-crew-stars">${'★'.repeat(c.experience_level)}</span>
+            </span>`;
+        }).join('');
+
+        return `<div class="vessel-card" style="animation-delay:${i * 0.04}s">
+            <div class="vessel-header">
+                <div class="vessel-name-row">
+                    <span class="vessel-icon">🚀</span>
+                    <h3 class="vessel-name">${escapeHtml(v.name)}</h3>
+                    <span class="vessel-crew-count">${v.crew_count} crew</span>
+                </div>
+                <div class="vessel-loc ${locCls}">${locLabel}</div>
+            </div>
+            <div class="vessel-caps">${capsule}</div>
+            <div class="vessel-crew-list">${crewPills}</div>
+        </div>`;
+    }).join('');
 }
 
 // ── Achievements Tab ──────────────────────────────────────────────────

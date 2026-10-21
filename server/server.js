@@ -349,6 +349,45 @@ app.get('/api/contracts/progress', (req, res) => {
     } catch (err) { res.status(500).json({ error: String(err) }); }
 });
 
+// ── Vessels ───────────────────────────────────────────────────────────────────
+app.get('/api/vessels', (_req, res) => {
+    try {
+        const kerbals = db.getAllKerbals().filter(k => k.state === 'Assigned' && k.currentVessel);
+        const map = {};
+        for (const k of kerbals) {
+            if (!map[k.currentVessel]) {
+                map[k.currentVessel] = { name: k.currentVessel, location: k.currentLocation, crew: [] };
+            }
+            map[k.currentVessel].crew.push({
+                name:             k.name,
+                trait:            k.trait,
+                experience_level: k.experienceLevel,
+                experience:       k.experience,
+                courage:          k.courage,
+                stupidity:        k.stupidity,
+                gender:           k.gender,
+                veteran:          k.veteran,
+                is_badass:        k.isBadass,
+                flights:          k.flights,
+            });
+        }
+        const vessels = Object.values(map).map(v => {
+            const byTrait = { Pilot: [], Engineer: [], Scientist: [] };
+            for (const c of v.crew) if (byTrait[c.trait]) byTrait[c.trait].push(c);
+            const bestLevel = trait => Math.max(0, ...byTrait[trait].map(c => c.experience_level));
+            return {
+                ...v,
+                crew_count:    v.crew.length,
+                best_pilot:    bestLevel('Pilot'),
+                best_engineer: bestLevel('Engineer'),
+                best_scientist:bestLevel('Scientist'),
+            };
+        });
+        vessels.sort((a, b) => a.name.localeCompare(b.name));
+        res.json({ vessels, count: vessels.length });
+    } catch (err) { res.status(500).json({ error: String(err) }); }
+});
+
 // ── Achievements ──────────────────────────────────────────────────────────────
 app.get('/api/achievements', (_req, res) => {
     try {

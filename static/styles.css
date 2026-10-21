@@ -1948,6 +1948,177 @@ body {
     line-height: 1.6;
 }
 
+/* ── Vessels Tab ──────────────────────────────────────────────────────────── */
+
+.vessels-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.vessel-card {
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 14px;
+    overflow: hidden;
+    transition: transform 0.15s, box-shadow 0.15s;
+    animation: fadeInUp 0.4s ease-out both;
+}
+
+.vessel-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 28px rgba(0, 217, 255, 0.12);
+}
+
+.vessel-header {
+    padding: 0.85rem 1rem 0.6rem;
+    border-bottom: 1px solid rgba(0, 217, 255, 0.1);
+}
+
+.vessel-name-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.4rem;
+}
+
+.vessel-icon { font-size: 1.1rem; flex-shrink: 0; }
+
+.vessel-name {
+    font-family: var(--font-display);
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vessel-crew-count {
+    font-size: 0.7rem;
+    font-family: var(--font-display);
+    color: var(--text-secondary);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.vessel-loc {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
+    letter-spacing: 0.3px;
+}
+
+.vloc-orbit    { background: rgba(0, 217, 255, 0.15); color: var(--accent-cyan);   border: 1px solid rgba(0,217,255,0.35); }
+.vloc-landed   { background: rgba(255,107,53,0.15);   color: var(--accent-orange); border: 1px solid rgba(255,107,53,0.35); }
+.vloc-splashed { background: rgba(61,220,132,0.12);   color: var(--accent-green);  border: 1px solid rgba(61,220,132,0.35); }
+.vloc-suborbit { background: rgba(255,217,61,0.12);   color: #ffd93d;              border: 1px solid rgba(255,217,61,0.35); }
+.vloc-escape   { background: rgba(180,104,216,0.15);  color: #c47cf5;              border: 1px solid rgba(180,104,216,0.35); }
+.vloc-unknown  { background: rgba(143,163,199,0.1);   color: var(--text-secondary);border: 1px solid rgba(143,163,199,0.2); }
+
+/* Capability strip */
+.vessel-caps {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid rgba(0, 217, 255, 0.08);
+}
+
+.vessel-cap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.5rem 0.7rem;
+    font-size: 0.72rem;
+    overflow: hidden;
+    border-right: 1px solid rgba(0, 217, 255, 0.06);
+}
+
+.vessel-cap:last-child { border-right: none; }
+
+.vessel-cap--empty { opacity: 0.3; }
+
+.vessel-cap-icon { font-size: 0.9rem; flex-shrink: 0; }
+
+.vessel-cap-stars {
+    font-size: 0.55rem;
+    color: #ffd93d;
+    letter-spacing: -1px;
+    flex-shrink: 0;
+}
+
+.vessel-cap-name {
+    color: var(--text-secondary);
+    font-size: 0.65rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.vessel-cap-none { color: var(--text-secondary); font-size: 0.65rem; }
+
+.vessel-cap-extra {
+    font-size: 0.6rem;
+    color: var(--accent-cyan);
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+/* Crew pills */
+.vessel-crew-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    padding: 0.6rem 0.8rem;
+}
+
+.vessel-crew-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.68rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 20px;
+    border: 1px solid rgba(143,163,199,0.2);
+    background: rgba(255,255,255,0.04);
+    color: var(--text-secondary);
+    cursor: default;
+    white-space: nowrap;
+    transition: background 0.15s;
+}
+
+.vessel-crew-pill:hover { background: rgba(255,255,255,0.08); }
+
+.vcrew-pilot     { border-color: rgba(0,217,255,0.25);  color: #7dd8f5; }
+.vcrew-engineer  { border-color: rgba(255,107,53,0.25); color: #f5a98a; }
+.vcrew-scientist { border-color: rgba(61,220,132,0.25); color: #8de8b0; }
+
+.vessel-crew-stars {
+    font-size: 0.5rem;
+    color: #ffd93d;
+    letter-spacing: -1px;
+}
+
+.vessel-crew-badge {
+    font-size: 0.55rem;
+    font-weight: 700;
+    color: var(--accent-orange);
+    margin-left: 1px;
+}
+
+@media (max-width: 768px) {
+    .vessels-grid { grid-template-columns: 1fr; }
+}
+
 /* ── Achievements Tab ─────────────────────────────────────────────────────── */
 
 .ach-section {

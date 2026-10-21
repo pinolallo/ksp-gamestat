@@ -99,6 +99,9 @@
             <button class="tab-btn" data-tab="contracts" onclick="showTab('contracts', this)">
                 📋 Contracts
             </button>
+            <button class="tab-btn" data-tab="vessels" onclick="showTab('vessels', this)">
+                🛸 Vessels
+            </button>
             <button class="tab-btn" data-tab="achievements" onclick="showTab('achievements', this)">
                 🏆 Achievements
             </button>
@@ -249,6 +252,50 @@
                 </table>
             </div>
         </section>
+        <!-- Vessels Tab -->
+        <section class="tab-content" id="vesselsTab">
+            <div class="panel-header">
+                <div class="roster-title-row">
+                    <h2>🛸 Crewed Vessels</h2>
+                    <div class="roster-counter">
+                        <span id="vesselShowing">0</span>
+                        <span class="counter-label">SHOWING</span>
+                        /
+                        <span id="vesselTotal">0</span>
+                        <span class="counter-label">VESSELS</span>
+                    </div>
+                </div>
+                <div class="roster-controls">
+                    <div class="control-group">
+                        <label class="control-label">🔍 SEARCH</label>
+                        <input type="text" id="vesselSearch" placeholder="Vessel, crew, or location…"
+                               class="input-field" oninput="applyVesselFilters()">
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label">⚡ SORT BY</label>
+                        <select id="vesselSortSelect" class="filter-select" onchange="applyVesselFilters()">
+                            <option value="name">🔤 Name A→Z</option>
+                            <option value="crew">👨‍🚀 Crew Size</option>
+                            <option value="pilot">✈️ Best Pilot</option>
+                            <option value="engineer">🔧 Best Engineer</option>
+                            <option value="scientist">🔬 Best Scientist</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label">🌍 LOCATION</label>
+                        <select id="vesselLocFilter" class="filter-select" onchange="applyVesselFilters()">
+                            <option value="all">All locations</option>
+                            <option value="orbit">Orbiting</option>
+                            <option value="landed">Landed</option>
+                            <option value="splashed">Splashed</option>
+                            <option value="suborbit">Sub-orbital</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="vessels-grid" id="vesselsGrid"></div>
+        </section>
+
         <!-- Achievements Tab -->
         <section class="tab-content" id="achievementsTab">
             <div id="achievementsContent">
