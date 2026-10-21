@@ -1,106 +1,158 @@
 # KSP GameStats — Mission Control Dashboard
 
-A desktop application for analysing and visualising Kerbal Space Program save-file statistics. Built with Electron + Node.js/Express, it runs as a native app on macOS, Windows, and Linux — no external runtime required.
+A browser-based statistics dashboard for **Kerbal Space Program** save files. Parses `persistent.sfs` and presents your career data in a space-themed UI — kerbals, tourists, contracts, crewed vessels, and world achievements, all in one place.
 
 ![KSP GameStats](https://img.shields.io/badge/KSP-GameStats-00d9ff?style=for-the-badge)
-![Platform](https://img.shields.io/badge/platform-mac%20%7C%20win%20%7C%20linux-lightgrey?style=for-the-badge)
+![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey?style=for-the-badge)
 ![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)
-
----
-
-## Features
-
-- **Kerbal Roster** — star rating (computed from KSP XP), trait badges, missions, locations, join date and service duration per kerbal; corps summary bar (Pilots / Engineers / Scientists, assigned vs available)
-- **Tourist Roster** — live view of flying tourists with contract objectives and completion status per body; returned tourists grouped by contract mission with date and agency
-- **Contracts Dashboard** — visual progression timeline: cumulative earnings, contracts per period, earnings per period, prestige breakdown, and top destinations
-- **Contract Drill-down** — click any contract type to see its own filtered dashboard; TourismContract shows passenger counts instead of funds
-- **Accurate Visit Counts** — mission-level deduplication: multiple events in the same mission (Flyby + Orbit + Land) count as one visit, not three
-- **Incremental Parsing** — MD5-based cache avoids re-parsing an unchanged save file; force-refresh available
-- **SQLite Database** — stored in the OS user-data directory, survives app updates
-- **Space-Themed UI** — Orbitron/IBM Plex Mono fonts, animated starfield, cyan/orange palette
-- **Native File Picker** — Browse for `persistent.sfs` without typing the path
 
 ---
 
 ## Screenshots
 
-**Kerbal Roster** — summary stats, corps breakdown (Pilots / Engineers / Scientists assigned vs available), and crew cards sorted by star rating
+**Kerbal Roster** — 162 kerbals sorted by star rating, with corps breakdown (Pilots / Engineers / Scientists, assigned vs available) and animated kerbal cards
 
 ![Kerbal Roster](screenshots/kerbals.png)
 
-**Kerbal Detail** — full profile with star level, join date, service time, courage/stupidity bars, and every body visited
+**Kerbal Detail** — full profile modal with trait badge, star level, current mission and vessel (clickable → jump to vessel), join date, service time, courage/stupidity bars, and every destination visited
 
 ![Kerbal Detail](screenshots/kerbal-detail.png)
 
-**Tourist Roster — Flying** — active tourists with contract objectives per celestial body; ✓ green = completed, ○ yellow = pending; 🏁 badge for tourists whose contract is already fulfilled and awaiting recovery
+**Crewed Vessels** — all active crewed vessels with KSP type (Space Station, Surface Base, Spacecraft…), readable location ("Landed on Duna", "Orbiting Ike"), best crew ratings per trait, and crew pills — click any crew member to open their kerbal card
+
+![Crewed Vessels](screenshots/vessels.png)
+
+**Programme Milestones & Achievements** — global milestones (first launch, first orbit, first Mun landing…) with KSP date, crew, and vessel; body-by-body achievement grid showing reached, landed, flag planted
+
+![Achievements](screenshots/achievements.png)
+
+**Tourist Roster — Flying** — active tourists with contract objectives per celestial body; ✓ green = completed, ○ yellow = pending; 🏁 badge for fulfilled contracts awaiting recovery
 
 ![Tourist Roster — Flying](screenshots/tourists-flying.png)
-
-**Tourist Roster — Returned** — 600+ historical tourists grouped by contract mission, with KSP date and agency
-
-![Tourist Roster — Returned](screenshots/tourists-returned.png)
 
 **Contract Statistics** — mission summary tiles, cumulative earnings curve, and per-period activity bars
 
 ![Contract Statistics](screenshots/contracts.png)
 
-**Contract Drill-down** — click any contract type to open a detailed modal with its own charts and top destinations
+**Contract Drill-down** — click any contract type to open a modal with its own charts and top destinations
 
 ![Contract Drill-down](screenshots/contract-detail.png)
 
 ---
 
-## Download
+## Features
 
-Pre-built installers are available on the [Releases](https://github.com/pinolallo/ksp-gamestat/releases) page:
+### Kerbal Roster
+- Star rating (0–5★) computed from KSP XP with correct level thresholds
+- Trait badges (Pilot / Engineer / Scientist), state (On Mission / Available / Dead)
+- Missions flown, unique destinations, join date and service duration
+- Corps summary bar: Pilots / Engineers / Scientists, assigned vs available
+- Click any card to open the full kerbal detail modal
 
-| Platform | File |
-|---|---|
-| macOS (Apple Silicon) | `KSP-GameStats-*-arm64.dmg` |
-| macOS (Intel) | `KSP-GameStats-*-x64.dmg` |
-| Windows | `KSP-GameStats-Setup-*.exe` |
-| Linux | `KSP-GameStats-*.AppImage` / `.deb` |
+### Kerbal Detail Modal
+- Current location and **vessel name** — click the vessel name to jump straight to the Vessels tab with that vessel highlighted
+- Courage and Stupidity bars
+- Every body visited, with visit count and XP tier
 
-### macOS note (unsigned build)
+### Crewed Vessels Tab
+- All vessels currently crewed, with:
+  - **Vessel type** parsed directly from the save file (Space Station, Surface Base, Spacecraft, Spaceplane, Rover…)
+  - **Readable location**: "Landed on Duna", "Orbiting Kerbin", "Splashed on Eve", "Sub-orbital over Kerbin", "Escaping Jool SOI"
+  - Best Pilot / Engineer / Scientist level aboard
+  - Full crew list as clickable pills — click any crew member to open their kerbal card
+- Search by vessel name or crew name; sort by name, crew size, or best trait level; filter by location type
 
-The app is ad-hoc signed but not notarized with an Apple Developer ID. On first launch macOS Gatekeeper will block it. This is a false positive — the binary is safe.
+### Achievements Tab
+- **Programme Milestones**: first launch, first orbit, first Mun landing, first flag, first crew recovery — with KSP in-game date, crew name, and vessel
+- **Body Achievement Grid**: for every celestial body, shows which of reached / landed / flag planted have been accomplished (manned or unmanned)
 
-**If macOS moved the app to the Bin ("Malware Blocked and Moved to Bin"):**
+### Tourist Roster
+- **Flying / Awaiting**: active tourists with contract objectives per body; completed objectives in green, pending in yellow; 🏁 badge for fulfilled contracts awaiting recovery
+- **Returned**: 600+ historical tourists grouped by contract mission with KSP date and agency
 
-1. Open **Trash**, right-click `KSP GameStats.app` → **Put Back**
-2. In Terminal, run:
+### Contracts Dashboard
+- Mission summary tiles (total contracts, funds, passengers, top body)
+- Cumulative earnings curve and per-period activity bars
+- Click any contract type to open a drill-down modal with its own charts
+
+### Technical
+- **Incremental parsing** — MD5-based cache; unchanged saves skip the parser entirely; force-refresh available
+- **Accurate visit counts** — mission-level deduplication: Flyby + Orbit + Land in the same mission = one visit
+- **SQLite database** — stored in `~/.ksp-gamestat/`, survives updates; auto-migrates schema
+- **Space-themed UI** — Orbitron / IBM Plex Mono, animated starfield, cyan / orange / green palette
+- **Cross-navigation** — kerbal cards link to vessels; vessel crew pills link to kerbal cards
+
+---
+
+## Quick Start (macOS — browser mode)
+
+The recommended way to run KSP GameStats on macOS is as a persistent background service accessible from any browser.
+
+### 1. Install
+
 ```bash
-xattr -rd com.apple.quarantine "/Applications/KSP GameStats.app"
+git clone https://github.com/pinolallo/ksp-gamestat.git
+cd ksp-gamestat
+npm install --omit=dev
 ```
-3. Double-click the app — it will open normally.
 
-**If macOS shows "cannot be opened" (standard Gatekeeper warning):**
-
-Open **System Settings → Privacy & Security**, scroll to the Security section, and click **Open Anyway**. Or use the Terminal command above.
-
-### Linux note
-
-Make the AppImage executable after download:
+### 2. Deploy as a LaunchAgent (auto-start at login)
 
 ```bash
-chmod +x KSP-GameStats-*.AppImage
+./deploy-mac.sh install
+```
+
+This installs a macOS LaunchAgent, starts the server at **http://127.0.0.1:4999**, and opens the dashboard in your browser. The service restarts automatically if it crashes and relaunches at every login.
+
+### 3. Parse your save file
+
+1. Open **http://127.0.0.1:4999** and click the **Admin** tab
+2. Click **Scan Saves** — KSP GameStats will find all `persistent.sfs` files under `~/Applications/Kerbal Space Program/`
+3. Select your career save and click **Parse**
+
+### Deploy script commands
+
+```
+./deploy-mac.sh install     Install LaunchAgent and open browser
+./deploy-mac.sh uninstall   Stop and remove the service
+./deploy-mac.sh start       Start the service
+./deploy-mac.sh stop        Stop the service
+./deploy-mac.sh restart     Restart the service
+./deploy-mac.sh status      Show PID, URL, health check
+./deploy-mac.sh logs        Tail live log output
+./deploy-mac.sh open        Open dashboard in browser
+```
+
+Logs are written to `~/Library/Logs/ksp-gamestat/`.
+
+### Quick start without installing
+
+```bash
+npm run serve          # starts server at http://127.0.0.1:4999
+# or
+KSP_PORT=5000 node server/server.js
 ```
 
 ---
 
-## Quick Start
+## Quick Start (Linux / Windows)
 
-1. Open the app and go to the **Admin** tab
-2. Click **Browse…** (or type the full path) to select your `persistent.sfs` file — typically at:
-   - **macOS**: `~/Library/Application Support/Steam/steamapps/common/Kerbal Space Program/saves/<save-name>/persistent.sfs`
-   - **Windows**: `%ProgramFiles(x86)%\Steam\steamapps\common\Kerbal Space Program\saves\<save-name>\persistent.sfs`
-3. Click **Configure**, then **Start Parsing**
-4. Switch to the **Kerbals**, **Tourists**, or **Contracts** tab to explore your data
+```bash
+git clone https://github.com/pinolallo/ksp-gamestat.git
+cd ksp-gamestat
+npm install --omit=dev
+npm run serve
+# Open http://127.0.0.1:4999 in your browser
+```
 
-The database is stored automatically in:
-- macOS: `~/Library/Application Support/ksp-gamestat/ksp_stats.db`
-- Windows: `%APPDATA%\ksp-gamestat\ksp_stats.db`
-- Linux: `~/.config/ksp-gamestat/ksp_stats.db`
+The default KSP save location varies by platform:
+
+| Platform | Default save path |
+|---|---|
+| macOS (Steam) | `~/Library/Application Support/Steam/steamapps/common/Kerbal Space Program/saves/<name>/persistent.sfs` |
+| macOS (direct) | `~/Applications/Kerbal Space Program/saves/<name>/persistent.sfs` |
+| Windows (Steam) | `%ProgramFiles(x86)%\Steam\steamapps\common\Kerbal Space Program\saves\<name>\persistent.sfs` |
+| Linux (Steam) | `~/.steam/steam/steamapps/common/Kerbal Space Program/saves/<name>/persistent.sfs` |
 
 ---
 
@@ -114,50 +166,29 @@ The database is stored automatically in:
 ### Run in dev mode
 
 ```bash
-# Clone
 git clone https://github.com/pinolallo/ksp-gamestat.git
 cd ksp-gamestat
-
 npm install
-npm start
+npm run serve
+# Open http://127.0.0.1:4999
 ```
 
-The Express server also runs standalone for browser-based development:
-
-```bash
-KSP_PORT=4999 node server/server.js   # Opens at http://localhost:4999
-```
-
-### Build installers
-
-```bash
-npm run build:mac     # macOS DMG (requires macOS)
-npm run build:win     # Windows NSIS installer (requires Windows)
-npm run build:linux   # Linux AppImage + deb (requires Linux)
-```
-
-### Project Structure
+### Project structure
 
 ```
 ksp-gamestat/
 ├── server/
-│   ├── server.js           Express REST API (port via KSP_PORT env)
-│   ├── sfsParser.js        KSP .sfs save-file parser (Node.js)
-│   └── database.js         SQLite manager (better-sqlite3)
-├── package.json            Electron + electron-builder config
-├── electron/
-│   ├── main.js             Electron main process: fork server, IPC, window
-│   └── preload.js          Context bridge (native file picker)
-├── build/                  App icons
-├── scripts/
-│   └── afterSign.js        Ad-hoc code signing hook (macOS)
-├── .github/workflows/
-│   └── build.yml           CI matrix: mac (arm64+x64), win, linux
-└── static/
-    ├── index.html          Single-page application
-    ├── app.js              Frontend logic (vanilla JS, no framework)
-    ├── styles.css          Space-themed CSS
-    └── fonts/              Bundled Orbitron + IBM Plex Mono (offline)
+│   ├── server.js       Express REST API (port via KSP_PORT env var)
+│   ├── sfsParser.js    KSP .sfs save-file parser (state machine, no regex)
+│   └── database.js     SQLite manager (better-sqlite3, auto-migration)
+├── static/
+│   ├── index.html      Single-page application shell
+│   ├── app.js          Frontend logic (vanilla JS, no framework)
+│   ├── styles.css      Space-themed CSS (Orbitron, IBM Plex Mono)
+│   └── fonts/          Bundled fonts (works offline)
+├── deploy-mac.sh       macOS LaunchAgent deploy / management script
+├── package.json
+└── LICENSE
 ```
 
 ---
@@ -166,44 +197,34 @@ ksp-gamestat/
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/api/config` | Current configuration |
-| POST | `/api/config` | Set the `persistent.sfs` path |
-| POST | `/api/parse` | Parse the save file (supports `{"force": true}`) |
-| GET | `/api/summary` | Top-level stats (kerbals, flights, contracts, funds) |
-| GET | `/api/kerbals` | All kerbals (tourists excluded) |
-| GET | `/api/kerbals/<name>` | Single kerbal detail |
-| GET | `/api/tourists` | All tourists with state, objectives, and location history |
-| GET | `/api/contracts` | Contracts aggregated by type |
-| GET | `/api/contracts/progress` | Progression timeline data (optional `?type=` filter) |
 | GET | `/api/health` | Health check |
+| GET | `/api/config` | Current configuration (sfs path, parse status) |
+| POST | `/api/config` | Set the `persistent.sfs` path |
+| GET | `/api/scan-saves` | Auto-detect KSP save files on disk |
+| POST | `/api/parse` | Parse the save file; supports `{"force": true}` |
+| GET | `/api/summary` | Top-level stats (kerbals, flights, contracts, funds) |
+| GET | `/api/kerbals` | All crew kerbals |
+| GET | `/api/kerbals/:name` | Single kerbal with full location history |
+| GET | `/api/tourists` | All tourists with state, objectives, location history |
+| GET | `/api/contracts` | Contracts aggregated by type |
+| GET | `/api/contracts/progress` | Progression timeline (optional `?type=` filter) |
+| GET | `/api/vessels` | All currently crewed vessels with crew details |
+| GET | `/api/achievements` | Programme milestones and per-body achievement grid |
 | GET | `/api/system-info` | DB size and parse history |
-
----
-
-## CI / CD
-
-GitHub Actions builds the app on every version tag (`v*`). Four runners produce native binaries for each platform; a draft GitHub Release is created automatically with all artifacts.
-
-To publish a new release:
-
-```bash
-git tag v1.2.0
-git push origin v1.2.0
-```
-
-Then review and publish the draft release on GitHub.
 
 ---
 
 ## Troubleshooting
 
-**Parsing is slow** — files over 50 MB can take a minute or two on first parse. Subsequent parses skip unchanged files automatically.
+**Parse is slow** — files over 50 MB take 10–30 s on first parse. Subsequent parses skip unchanged files automatically (MD5 check).
 
-**"File not found"** — use the absolute path to `persistent.sfs`; verify the file exists and is readable.
+**"No vessels found"** — the service may be running a stale version. Run `./deploy-mac.sh restart` to ensure the latest code is active.
 
-**Database issues** — delete `ksp_stats.db` from the user-data directory and re-parse. The schema is recreated automatically with migrations.
+**Port already in use** — `deploy-mac.sh start` automatically kills any stale process on the configured port before loading the LaunchAgent.
 
-**Backend does not start (dev mode)** — run `npm install` to ensure `express`, `cors`, and `better-sqlite3` are installed.
+**Database issues** — delete `~/.ksp-gamestat/ksp_stats.db` and re-parse. The schema is recreated automatically with migrations for all new columns.
+
+**Backend does not start** — run `npm install` to ensure `express`, `cors`, and `better-sqlite3` are installed.
 
 ---
 
@@ -213,4 +234,4 @@ MIT — see [LICENSE](LICENSE) for details.
 
 ---
 
-*May your Kerbals always make it home.* 🚀
+*May your Kerbals always make it home.*
