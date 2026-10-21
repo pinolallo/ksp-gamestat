@@ -138,6 +138,13 @@ cmd_start() {
     if [[ ! -f "$PLIST" ]]; then
         echo "❌ Not installed yet. Run: $0 install" >&2; exit 1
     fi
+    # Clear any stale process holding the port
+    local stale; stale="$(lsof -ti:"$PORT" 2>/dev/null || true)"
+    if [[ -n "$stale" ]]; then
+        echo "   Clearing stale process on port $PORT…"
+        echo "$stale" | xargs kill -9 2>/dev/null || true
+        sleep 0.5
+    fi
     launchctl load -w "$PLIST"
     echo "✅ Started → $URL"
 }
