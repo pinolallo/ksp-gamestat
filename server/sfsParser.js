@@ -32,7 +32,7 @@ const BODY_ACTIVITY_XP = {
     Pol:    { Flyby: 2.0, Orbit: 4.5, Land: 5.0 },
     Eeloo:  { Flyby: 2.5, Orbit: 5.5, Land: 12.0 },
 };
-const KSP_LEVELS = [2, 6, 16, 32, 64];
+const KSP_LEVELS = [2, 6, 16, 24, 64];
 
 const FLIGHT_EVENTS = new Set([
     'Flight', 'Suborbit', 'Orbit', 'Flyby', 'Escape',
