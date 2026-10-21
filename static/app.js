@@ -425,7 +425,7 @@ function renderKerbals(kerbals) {
             <div class="kerbal-current-location">
                 <span>📍</span>
                 <span class="current-loc-text">${escapeHtml(k.current_location)}</span>
-                ${k.current_vessel ? `<span class="current-vessel-sep">•</span><span class="current-vessel-name">🚀 ${escapeHtml(k.current_vessel)}</span>` : ''}
+                ${k.current_vessel ? `<span class="current-vessel-sep">•</span><button class="current-vessel-name vessel-link" onclick="event.stopPropagation();openVesselDetail(${JSON.stringify(k.current_vessel)})">🚀 ${escapeHtml(k.current_vessel)}</button>` : ''}
             </div>` : ''}
             ${top5.length ? `
             <div class="kerbal-locations">
@@ -564,7 +564,7 @@ function renderTourists(tourists) {
             <div class="kerbal-current-location">
                 <span>📍</span>
                 <span class="current-loc-text">${escapeHtml(locStr)}</span>
-                ${t.current_vessel ? `<span class="current-vessel-sep">•</span><span class="current-vessel-name">🚀 ${escapeHtml(t.current_vessel)}</span>` : ''}
+                ${t.current_vessel ? `<span class="current-vessel-sep">•</span><button class="current-vessel-name vessel-link" onclick="openVesselDetail(${JSON.stringify(t.current_vessel)})">🚀 ${escapeHtml(t.current_vessel)}</button>` : ''}
             </div>` : ''}
             ${(() => {
                 const objs = t.objectives || [];
@@ -793,7 +793,7 @@ function populateModal(k) {
             <span class="modal-assignment-loc">${escapeHtml(k.current_location)}</span>
             ${k.current_vessel ? `<span class="current-vessel-sep">•</span>
             <span>🚀</span>
-            <span class="modal-assignment-vessel">${escapeHtml(k.current_vessel)}</span>` : ''}`;
+            <button class="modal-assignment-vessel vessel-link" onclick="openVesselDetail(${JSON.stringify(k.current_vessel)})">${escapeHtml(k.current_vessel)}</button>` : ''}`;
     }
 
     document.getElementById('modalStatsGrid').innerHTML = `
@@ -864,6 +864,22 @@ function populateModal(k) {
             </div>
         `;
     }
+}
+
+function openVesselDetail(vesselName) {
+    document.getElementById('kerbalModal').classList.remove('modal-visible');
+    showTab('vessels');
+    const searchEl = document.getElementById('vesselSearch');
+    searchEl.value = vesselName;
+    applyVesselFilters();
+    requestAnimationFrame(() => {
+        const card = document.querySelector(`.vessel-card[data-vessel-name="${CSS.escape(vesselName)}"]`);
+        if (card) {
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            card.classList.add('vessel-card--highlight');
+            setTimeout(() => card.classList.remove('vessel-card--highlight'), 2000);
+        }
+    });
 }
 
 function closeKerbalDetail(event) {
@@ -1395,15 +1411,15 @@ function renderVessels(vessels) {
             if (c.is_badass) badges.push('B');
             const suffix = badges.length ? ` <span class="vessel-crew-badge">${badges.join('')}</span>` : '';
             const traitCls = c.trait ? `vcrew-${c.trait.toLowerCase()}` : '';
-            return `<span class="vessel-crew-pill ${traitCls}" title="${escapeHtml(c.name)} · ${c.trait} ${starRating(c.experience_level)} · ${c.flights} flights">
+            return `<button class="vessel-crew-pill ${traitCls}" onclick="openKerbalDetail(${JSON.stringify(c.name)})" title="Open ${escapeHtml(c.name)}'s record · ${c.trait} ${starRating(c.experience_level)} · ${c.flights} flights">
                 ${avatar} ${escapeHtml(c.name.replace(' Kerman', ''))}${suffix} <span class="vessel-crew-stars">${'★'.repeat(c.experience_level)}</span>
-            </span>`;
+            </button>`;
         }).join('');
 
         const vTypeIcon  = VESSEL_TYPE_ICON[v.vessel_type]  || '🚀';
         const vTypeText  = vesselTypeLabel(v.vessel_type);
 
-        return `<div class="vessel-card" style="animation-delay:${i * 0.04}s">
+        return `<div class="vessel-card" data-vessel-name="${escapeHtml(v.name)}" style="animation-delay:${i * 0.04}s">
             <div class="vessel-header">
                 <div class="vessel-name-row">
                     <span class="vessel-icon">${vTypeIcon}</span>
