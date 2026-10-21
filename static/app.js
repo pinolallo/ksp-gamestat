@@ -377,7 +377,8 @@ function renderKerbals(kerbals) {
         const inactive = STATE_INACTIVE.has(k.state) ? ' kerbal-card--inactive' : '';
         const top5     = k.locations.slice(0, 5);
         const more     = k.locations.length - 5;
-        const safeName = escapeHtml(k.name).replace(/'/g, "\\'");
+        const safeName  = escapeHtml(k.name).replace(/'/g, "\\'");
+        const safeVName = (k.current_vessel || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
         return `
         <div class="kerbal-card${inactive}" style="animation-delay:${i * 0.05}s"
@@ -425,7 +426,7 @@ function renderKerbals(kerbals) {
             <div class="kerbal-current-location">
                 <span>📍</span>
                 <span class="current-loc-text">${escapeHtml(k.current_location)}</span>
-                ${k.current_vessel ? `<span class="current-vessel-sep">•</span><button class="current-vessel-name vessel-link" onclick="event.stopPropagation();openVesselDetail(${JSON.stringify(k.current_vessel)})">🚀 ${escapeHtml(k.current_vessel)}</button>` : ''}
+                ${k.current_vessel ? `<span class="current-vessel-sep">•</span><button class="current-vessel-name vessel-link" onclick="event.stopPropagation();openVesselDetail('${safeVName}')">🚀 ${escapeHtml(k.current_vessel)}</button>` : ''}
             </div>` : ''}
             ${top5.length ? `
             <div class="kerbal-locations">
@@ -541,8 +542,9 @@ function renderTourists(tourists) {
             ? `<span class="tourist-body-badge">${escapeHtml(t.contract_body)}</span>` : '';
         const contractCompleteBadge = t.state === 'Flying' && !(t.objectives || []).length
             ? `<span class="tourist-state-badge tourist-contract-done">🏁 CONTRACT DONE</span>` : '';
-        const locStr = t.current_location && t.current_location !== 'Kerbin (KSC)'
+        const locStr   = t.current_location && t.current_location !== 'Kerbin (KSC)'
             ? t.current_location : (t.current_location || '');
+        const safeTVName = (t.current_vessel || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
         return `<div class="tourist-card tourist-card--flying" style="animation-delay:${i * 0.04}s">
             <div class="tourist-header">
                 <div class="tourist-avatar">${avatar}</div>
@@ -564,7 +566,7 @@ function renderTourists(tourists) {
             <div class="kerbal-current-location">
                 <span>📍</span>
                 <span class="current-loc-text">${escapeHtml(locStr)}</span>
-                ${t.current_vessel ? `<span class="current-vessel-sep">•</span><button class="current-vessel-name vessel-link" onclick="openVesselDetail(${JSON.stringify(t.current_vessel)})">🚀 ${escapeHtml(t.current_vessel)}</button>` : ''}
+                ${t.current_vessel ? `<span class="current-vessel-sep">•</span><button class="current-vessel-name vessel-link" onclick="openVesselDetail('${safeTVName}')">🚀 ${escapeHtml(t.current_vessel)}</button>` : ''}
             </div>` : ''}
             ${(() => {
                 const objs = t.objectives || [];
@@ -773,6 +775,7 @@ function populateModal(k) {
     const avatar     = TRAIT_AVATAR[k.trait] || (k.gender === 'Female' ? '👩‍🚀' : '👨‍🚀');
     const stateCls   = STATE_BADGE_CLS[k.state] || 'state-available';
     const stateLabel = STATE_LABEL[k.state] || k.state;
+    const safeVName  = (k.current_vessel || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
     document.getElementById('modalAvatar').textContent = avatar;
     document.getElementById('modalName').textContent   = k.name;
@@ -793,7 +796,7 @@ function populateModal(k) {
             <span class="modal-assignment-loc">${escapeHtml(k.current_location)}</span>
             ${k.current_vessel ? `<span class="current-vessel-sep">•</span>
             <span>🚀</span>
-            <button class="modal-assignment-vessel vessel-link" onclick="openVesselDetail(${JSON.stringify(k.current_vessel)})">${escapeHtml(k.current_vessel)}</button>` : ''}`;
+            <button class="modal-assignment-vessel vessel-link" onclick="openVesselDetail('${safeVName}')">${escapeHtml(k.current_vessel)}</button>` : ''}`;
     }
 
     document.getElementById('modalStatsGrid').innerHTML = `
@@ -1409,9 +1412,10 @@ function renderVessels(vessels) {
             const badges = [];
             if (c.veteran)   badges.push('V');
             if (c.is_badass) badges.push('B');
-            const suffix = badges.length ? ` <span class="vessel-crew-badge">${badges.join('')}</span>` : '';
+            const suffix   = badges.length ? ` <span class="vessel-crew-badge">${badges.join('')}</span>` : '';
             const traitCls = c.trait ? `vcrew-${c.trait.toLowerCase()}` : '';
-            return `<button class="vessel-crew-pill ${traitCls}" onclick="openKerbalDetail(${JSON.stringify(c.name)})" title="Open ${escapeHtml(c.name)}'s record · ${c.trait} ${starRating(c.experience_level)} · ${c.flights} flights">
+            const safeCName = c.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            return `<button class="vessel-crew-pill ${traitCls}" onclick="openKerbalDetail('${safeCName}')" title="Open ${escapeHtml(c.name)}'s record · ${c.trait} ${starRating(c.experience_level)} · ${c.flights} flights">
                 ${avatar} ${escapeHtml(c.name.replace(' Kerman', ''))}${suffix} <span class="vessel-crew-stars">${'★'.repeat(c.experience_level)}</span>
             </button>`;
         }).join('');
