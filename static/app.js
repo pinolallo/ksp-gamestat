@@ -1282,14 +1282,47 @@ function vesselLocType(loc) {
 }
 
 function vesselLocLabel(loc) {
-    if (!loc) return '?';
-    if (loc.includes('(landed)'))     return '🛬 ' + loc.replace(' (landed)', '');
-    if (loc.includes('(splashed)'))   return '🌊 ' + loc.replace(' (splashed)', '');
-    if (loc.startsWith('Orbiting '))  return '🔄 ' + loc.replace('Orbiting ', '');
-    if (loc.startsWith('Sub-orbital'))return '↗ ' + loc;
-    if (loc.startsWith('Escaping'))   return '🚀 ' + loc;
-    return '📍 ' + loc;
+    if (!loc || loc === 'Unknown') return 'Unknown location';
+    if (loc === 'Kerbin (KSC)')    return 'At Kerbin Space Centre';
+    if (loc.includes(' (landed)')) return 'Landed on ' + loc.replace(' (landed)', '');
+    if (loc.includes(' (splashed)')) return 'Splashed on ' + loc.replace(' (splashed)', '');
+    if (loc.startsWith('Orbiting '))  return 'Orbiting ' + loc.slice('Orbiting '.length);
+    if (loc.startsWith('Sub-orbital (')) return 'Sub-orbital over ' + loc.slice('Sub-orbital ('.length).replace(')', '');
+    if (loc.startsWith('Escaping '))  return 'Escaping ' + loc.slice('Escaping '.length) + ' SOI';
+    return loc;
 }
+
+const VESSEL_TYPE_LABEL = {
+    Ship:       'Spacecraft',
+    Station:    'Space Station',
+    Base:       'Surface Base',
+    Probe:      'Probe',
+    Rover:      'Rover',
+    SpacePlane: 'Spaceplane',
+    Lander:     'Lander',
+    Relay:      'Relay',
+    EVA:        'EVA Suit',
+    Flag:       'Flag',
+    Debris:     'Debris',
+};
+
+function vesselTypeLabel(t) {
+    return VESSEL_TYPE_LABEL[t] || (t || 'Vessel');
+}
+
+const VESSEL_TYPE_ICON = {
+    Ship:       '🚀',
+    Station:    '🛸',
+    Base:       '🏗',
+    Probe:      '📡',
+    Rover:      '🚗',
+    SpacePlane: '✈',
+    Lander:     '🛬',
+    Relay:      '📡',
+    EVA:        '🧑‍🚀',
+    Flag:       '🚩',
+    Debris:     '💥',
+};
 
 const VESSEL_LOC_CLS = {
     orbit:    'vloc-orbit',
@@ -1367,14 +1400,20 @@ function renderVessels(vessels) {
             </span>`;
         }).join('');
 
+        const vTypeIcon  = VESSEL_TYPE_ICON[v.vessel_type]  || '🚀';
+        const vTypeText  = vesselTypeLabel(v.vessel_type);
+
         return `<div class="vessel-card" style="animation-delay:${i * 0.04}s">
             <div class="vessel-header">
                 <div class="vessel-name-row">
-                    <span class="vessel-icon">🚀</span>
+                    <span class="vessel-icon">${vTypeIcon}</span>
                     <h3 class="vessel-name">${escapeHtml(v.name)}</h3>
                     <span class="vessel-crew-count">${v.crew_count} crew</span>
                 </div>
-                <div class="vessel-loc ${locCls}">${locLabel}</div>
+                <div class="vessel-meta-row">
+                    <span class="vessel-type-tag">${escapeHtml(vTypeText)}</span>
+                    <div class="vessel-loc ${locCls}">${locLabel}</div>
+                </div>
             </div>
             <div class="vessel-caps">${capsule}</div>
             <div class="vessel-crew-list">${crewPills}</div>

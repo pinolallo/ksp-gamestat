@@ -108,10 +108,11 @@ class KSPDatabase {
         const safeAdd = (table, col, def) => {
             try { this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`); } catch (_) {}
         };
-        safeAdd('tourists',       'objectives TEXT',       "DEFAULT '[]'");
-        safeAdd('kerbal_locations', 'activities TEXT',     "DEFAULT ''");
-        safeAdd('tourist_locations','activities TEXT',     "DEFAULT ''");
-        safeAdd('parse_history',  'game_ut REAL',          'DEFAULT 0.0');
+        safeAdd('tourists',       'objectives TEXT',            "DEFAULT '[]'");
+        safeAdd('kerbal_locations', 'activities TEXT',         "DEFAULT ''");
+        safeAdd('tourist_locations','activities TEXT',         "DEFAULT ''");
+        safeAdd('parse_history',  'game_ut REAL',              'DEFAULT 0.0');
+        safeAdd('kerbals',        'current_vessel_type TEXT',  "DEFAULT ''");
     }
 
     // ── Config ─────────────────────────────────────────────────────────────────
@@ -129,15 +130,16 @@ class KSPDatabase {
         const upsertKerbal = this.db.prepare(`
             INSERT INTO kerbals
                 (name, trait, state, experience_level, experience, courage, stupidity,
-                 gender, veteran, is_badass, flights, current_location, current_vessel, hired_ut)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 gender, veteran, is_badass, flights, current_location, current_vessel, current_vessel_type, hired_ut)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(name) DO UPDATE SET
                 trait=excluded.trait, state=excluded.state,
                 experience_level=excluded.experience_level, experience=excluded.experience,
                 courage=excluded.courage, stupidity=excluded.stupidity,
                 gender=excluded.gender, veteran=excluded.veteran, is_badass=excluded.is_badass,
                 flights=excluded.flights, current_location=excluded.current_location,
-                current_vessel=excluded.current_vessel, hired_ut=excluded.hired_ut
+                current_vessel=excluded.current_vessel, current_vessel_type=excluded.current_vessel_type,
+                hired_ut=excluded.hired_ut
         `);
 
         const upsertLoc = this.db.prepare(`
@@ -152,7 +154,7 @@ class KSPDatabase {
                 upsertKerbal.run(
                     k.name, k.trait, k.state, k.experienceLevel, k.experience,
                     k.courage, k.stupidity, k.gender, k.veteran ? 1 : 0, k.isBadass ? 1 : 0,
-                    k.flights, k.currentLocation, k.currentVessel, k.hiredUt
+                    k.flights, k.currentLocation, k.currentVessel, k.currentVesselType || '', k.hiredUt
                 );
                 for (const [body, count] of Object.entries(k.locations || {})) {
                     const actsSet = k.bodyActivities[body];
@@ -199,8 +201,9 @@ class KSPDatabase {
                 isBadass:        row.is_badass === 1,
                 flights:         row.flights,
                 currentLocation: row.current_location,
-                currentVessel:   row.current_vessel,
-                hiredUt:         row.hired_ut,
+                currentVessel:     row.current_vessel,
+                currentVesselType: row.current_vessel_type || '',
+                hiredUt:           row.hired_ut,
                 locations,
                 bodyActivities,
             };
@@ -220,10 +223,10 @@ class KSPDatabase {
             name:            row.name, trait: row.trait, state: row.state,
             experienceLevel: row.experience_level, experience: row.experience,
             courage:         row.courage, stupidity: row.stupidity, gender: row.gender,
-            veteran:         row.veteran === 1, isBadass: row.is_badass === 1,
-            flights:         row.flights, currentLocation: row.current_location,
-            currentVessel:   row.current_vessel, hiredUt: row.hired_ut,
-            locations, bodyActivities,
+            veteran:           row.veteran === 1, isBadass: row.is_badass === 1,
+            flights:           row.flights, currentLocation: row.current_location,
+            currentVessel:     row.current_vessel, currentVesselType: row.current_vessel_type || '',
+            hiredUt:           row.hired_ut, locations, bodyActivities,
         };
     }
 

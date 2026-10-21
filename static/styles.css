@@ -2007,6 +2007,23 @@ body {
     flex-shrink: 0;
 }
 
+.vessel-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.vessel-type-tag {
+    font-size: 0.67rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    opacity: 0.85;
+    white-space: nowrap;
+}
+
 .vessel-loc {
     display: inline-block;
     font-size: 0.72rem;

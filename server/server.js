@@ -356,7 +356,7 @@ app.get('/api/vessels', (_req, res) => {
         const map = {};
         for (const k of kerbals) {
             if (!map[k.currentVessel]) {
-                map[k.currentVessel] = { name: k.currentVessel, location: k.currentLocation, crew: [] };
+                map[k.currentVessel] = { name: k.currentVessel, location: k.currentLocation, vessel_type: k.currentVesselType || '', crew: [] };
             }
             map[k.currentVessel].crew.push({
                 name:             k.name,

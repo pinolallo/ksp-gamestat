@@ -50,7 +50,7 @@ function makeKerbal(name) {
         name, flights: 0, locations: {}, isTourist: false,
         trait: '', state: 'Available', experienceLevel: 0, experience: 0.0,
         courage: 0.0, stupidity: 0.0, gender: 'Male', veteran: false,
-        isBadass: false, currentLocation: '', currentVessel: '', hiredUt: 0.0,
+        isBadass: false, currentLocation: '', currentVessel: '', currentVesselType: '', hiredUt: 0.0,
         bodyActivities: {}, bodyMissions: {},
     };
 }
@@ -308,9 +308,9 @@ class SFSParser {
 
     // ── Vessel Assignments ────────────────────────────────────────────────────
     async parseVesselAssignments(crew) {
-        const locationMap = {}, vesselMap = {};
+        const locationMap = {}, vesselMap = {}, vesselTypeMap = {};
         let inVessel = false, absIndent = 0, baseDepth = 0, inOrbit = false;
-        let vName = null, vSit = null, vLandedAt = null, vOrbitRef = null;
+        let vName = null, vType = null, vSit = null, vLandedAt = null, vOrbitRef = null;
         let crewNames = new Set();
 
         for await (const line of readLines(this.filepath)) {
@@ -330,19 +330,20 @@ class SFSParser {
                         else if (sit === 'SUB_ORBITAL')                   loc = `Sub-orbital (${refBody})`;
                         else if (sit === 'ESCAPING')                      loc = `Escaping ${refBody}`;
                         else                                              loc = sit || 'Unknown';
-                        for (const cn of crewNames) { locationMap[cn] = loc; vesselMap[cn] = vName || ''; }
+                        for (const cn of crewNames) { locationMap[cn] = loc; vesselMap[cn] = vName || ''; vesselTypeMap[cn] = vType || ''; }
                     }
                     inVessel = false; inOrbit = false;
-                    vName = vSit = vLandedAt = vOrbitRef = null; crewNames = new Set();
+                    vName = vType = vSit = vLandedAt = vOrbitRef = null; crewNames = new Set();
                 }
             }
             if (!inVessel && s === 'VESSEL') {
                 inVessel = true; baseDepth = absIndent + 1;
-                vName = vSit = vLandedAt = vOrbitRef = null; inOrbit = false; crewNames = new Set();
+                vName = vType = vSit = vLandedAt = vOrbitRef = null; inOrbit = false; crewNames = new Set();
             }
             if (inVessel) {
                 if (absIndent === baseDepth) {
                     if      (s.startsWith('name =') && vName === null) vName    = val(s);
+                    else if (s.startsWith('type =') && vType === null) vType    = val(s);
                     else if (s.startsWith('sit ='))                    vSit     = val(s);
                     else if (s.startsWith('landedAt ='))               { const v = val(s); if (v) vLandedAt = v; }
                     else if (s === 'ORBIT' && !inOrbit)                inOrbit  = true;
@@ -358,10 +359,10 @@ class SFSParser {
         }
         for (const [name, kerbal] of Object.entries(crew)) {
             const st = kerbal.state || '';
-            if      (st === 'Available' || st === 'Awaiting') { kerbal.currentLocation = 'Kerbin (KSC)'; kerbal.currentVessel = ''; }
-            else if (st === 'Assigned'  || st === 'Flying')   { kerbal.currentLocation = locationMap[name] || 'Unknown'; kerbal.currentVessel = vesselMap[name] || ''; }
-            else if (st === 'Dead')                            { kerbal.currentLocation = 'N/A'; kerbal.currentVessel = ''; }
-            else                                               { kerbal.currentLocation = 'Unknown'; kerbal.currentVessel = ''; }
+            if      (st === 'Available' || st === 'Awaiting') { kerbal.currentLocation = 'Kerbin (KSC)'; kerbal.currentVessel = ''; kerbal.currentVesselType = ''; }
+            else if (st === 'Assigned'  || st === 'Flying')   { kerbal.currentLocation = locationMap[name] || 'Unknown'; kerbal.currentVessel = vesselMap[name] || ''; kerbal.currentVesselType = vesselTypeMap[name] || ''; }
+            else if (st === 'Dead')                            { kerbal.currentLocation = 'N/A'; kerbal.currentVessel = ''; kerbal.currentVesselType = ''; }
+            else                                               { kerbal.currentLocation = 'Unknown'; kerbal.currentVessel = ''; kerbal.currentVesselType = ''; }
         }
     }
 
