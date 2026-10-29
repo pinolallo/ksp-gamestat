@@ -45,6 +45,17 @@ app.get('/api/scan-saves', (_req, res) => {
         '/Applications/Kerbal Space Program/saves',
         path.join(home, 'Library', 'Application Support', 'Steam', 'steamapps', 'common', 'Kerbal Space Program 2', 'saves'),
     ];
+    // Steam on Linux (including Flatpak) and Windows
+    const steamKsp = path.join('steamapps', 'common', 'Kerbal Space Program', 'saves');
+    for (const steamDir of [
+        path.join(home, '.steam', 'steam'),
+        path.join(home, '.steam', 'debian-installation'),
+        path.join(home, '.local', 'share', 'Steam'),
+        path.join(home, '.var', 'app', 'com.valvesoftware.Steam', '.local', 'share', 'Steam'),
+    ]) searchRoots.push(path.join(steamDir, steamKsp));
+    for (const env of ['ProgramFiles(x86)', 'ProgramFiles']) {
+        if (process.env[env]) searchRoots.push(path.join(process.env[env], 'Steam', steamKsp));
+    }
     const configured = db.getConfig('sfs_path', '');
     if (configured) searchRoots.unshift(path.dirname(path.dirname(configured)));
 
@@ -52,6 +63,8 @@ app.get('/api/scan-saves', (_req, res) => {
     const visited = new Set();
 
     function scan(dir, depth) {
+        // ~/.steam/steam and friends are usually symlinks to the same folder
+        try { dir = fs.realpathSync(dir); } catch (_) { return; }
         if (depth > 5 || visited.has(dir)) return;
         visited.add(dir);
         let entries;
